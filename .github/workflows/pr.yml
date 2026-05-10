@@ -1,0 +1,50 @@
+name: PR Checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-test-jmh:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 26 (Temurin) with Gradle cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '26'
+          cache: gradle
+
+      - name: Install zopfli
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zopfli
+
+      - name: Build
+        run: ./gradlew --no-daemon build
+
+      - name: Test
+        run: ./gradlew --no-daemon test
+
+      - name: JMH benchmarks
+        run: ./gradlew --no-daemon jmh
+
+      - name: Upload build and test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-build-test-jmh-reports
+          path: |
+            build/reports/**
+            build/test-results/**
+            build/results/**
+            build/jmh-results/**
+          if-no-files-found: warn
