@@ -1,9 +1,11 @@
 package io.github.zeroone3010.pngfilteropt.cli;
 
+import io.github.zeroone3010.pngfilteropt.png.FilterInspector;
+import io.github.zeroone3010.pngfilteropt.png.PngDecoder;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Spec;
-import picocli.CommandLine.Model.CommandSpec;
 
 import java.nio.file.Path;
 
@@ -22,6 +24,8 @@ public final class InspectCommand implements Runnable {
 
     @Override
     public void run() {
-        spec.commandLine().getOut().printf("Parsed inspect request: input=%s%n", input);
+        var image = new PngDecoder().decode(input);
+        var counts = new FilterInspector().countFilters(input, image);
+        spec.commandLine().getOut().printf("Image %s: %dx%d bpp=%d filters=%s%n", input, image.width(), image.height(), image.bytesPerPixel(), counts);
     }
 }
