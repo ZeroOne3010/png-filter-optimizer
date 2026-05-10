@@ -11,6 +11,10 @@ on:
         description: "Post sticky PR comment (true/false)"
         required: false
         default: "false"
+      pr_number:
+        description: "PR number for optional sticky comment"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -67,8 +71,9 @@ jobs:
           if-no-files-found: warn
 
       - name: Sticky PR comment
-        if: ${{ github.event.inputs.sticky_pr_comment == 'true' && github.event.pull_request.number }}
+        if: ${{ github.event.inputs.sticky_pr_comment == 'true' && github.event.inputs.pr_number != '' }}
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: png-corpus-benchmark
+          number: ${{ github.event.inputs.pr_number }}
           path: build/reports/pngfilteropt/benchmark.md
