@@ -1,9 +1,10 @@
 package io.github.zeroone3010.pngfilteropt.cli;
 
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Parameters;
+import picocli.CommandLine.Spec;
+import picocli.CommandLine.Model.CommandSpec;
 
 import java.nio.file.Path;
 
@@ -19,6 +20,9 @@ import java.nio.file.Path;
 )
 public final class OptimizeCommand implements Runnable {
 
+    @Spec
+    CommandSpec spec;
+
     @Parameters(index = "0", paramLabel = "input.png", description = "Input PNG to optimize.")
     Path input;
 
@@ -30,8 +34,7 @@ public final class OptimizeCommand implements Runnable {
 
     @Override
     public void run() {
-        CommandLine commandLine = new CommandLine(this);
-        commandLine.getOut().printf(
+        spec.commandLine().getOut().printf(
                 "Parsed optimize request: input=%s, output=%s, optimizers=%s, tryAll=%s, zopflipng=%s, beam=%d%n",
                 input,
                 output,

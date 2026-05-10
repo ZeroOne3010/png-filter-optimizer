@@ -1,10 +1,11 @@
 package io.github.zeroone3010.pngfilteropt.cli;
 
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
+import picocli.CommandLine.Spec;
+import picocli.CommandLine.Model.CommandSpec;
 
 import java.nio.file.Path;
 
@@ -14,6 +15,9 @@ import java.nio.file.Path;
         description = "Run optimizer benchmarks for all PNGs under a directory."
 )
 public final class BenchmarkCommand implements Runnable {
+
+    @Spec
+    CommandSpec spec;
 
     @Parameters(index = "0", paramLabel = "directory", description = "Directory containing PNGs to benchmark.")
     Path directory;
@@ -37,7 +41,7 @@ public final class BenchmarkCommand implements Runnable {
 
     @Override
     public void run() {
-        new CommandLine(this).getOut().printf(
+        spec.commandLine().getOut().printf(
                 "Parsed benchmark request: directory=%s, optimizers=%s, tryAll=%s, zopflipng=%s, beam=%d, markdown=%s, json=%s%n",
                 directory,
                 java.util.Arrays.toString(optimizerSelection.optimizers),
