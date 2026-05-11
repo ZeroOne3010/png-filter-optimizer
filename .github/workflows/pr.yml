@@ -35,7 +35,12 @@ jobs:
         run: ./gradlew --no-daemon test
 
       - name: JMH benchmarks
-        run: ./gradlew --no-daemon jmh
+        run: |
+          if [ -d src/jmh ] && find src/jmh -type f -name "*.java" -print -quit | grep -q .; then
+            ./gradlew --no-daemon jmh
+          else
+            echo "No JMH benchmarks found under src/jmh; skipping jmh task."
+          fi
 
       - name: Upload build and test artifacts
         if: always()
