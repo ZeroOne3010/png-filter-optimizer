@@ -23,6 +23,15 @@ public final class FilterInspector {
         return counts;
     }
 
+    public java.util.List<PngFilter> listFilters(Path pngPath, RawImage image) {
+        byte[] bytes = readScanlineFilterBytes(pngPath, image.height(), image.bytesPerRow());
+        java.util.List<PngFilter> filters = new java.util.ArrayList<>(bytes.length);
+        for (byte b : bytes) {
+            filters.add(fromPngFilterByte(b));
+        }
+        return filters;
+    }
+
     public Map<PngFilter, Integer> countFilters(FilteredImage image) {
         Map<PngFilter, Integer> counts = zeroCounts();
         for (FilteredRow row : image.rows()) {

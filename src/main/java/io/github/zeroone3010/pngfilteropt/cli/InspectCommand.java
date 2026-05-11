@@ -25,7 +25,13 @@ public final class InspectCommand implements Runnable {
     @Override
     public void run() {
         var image = new PngDecoder().decode(input);
-        var counts = new FilterInspector().countFilters(input, image);
+        var inspector = new FilterInspector();
+        var counts = inspector.countFilters(input, image);
         spec.commandLine().getOut().printf("Image %s: %dx%d bpp=%d filters=%s%n", input, image.width(), image.height(), image.bytesPerPixel(), counts);
+        spec.commandLine().getOut().println("row,filter");
+        var filters = inspector.listFilters(input, image);
+        for (int row = 0; row < filters.size(); row++) {
+            spec.commandLine().getOut().printf("%d,%s%n", row, filters.get(row).name().toLowerCase());
+        }
     }
 }
