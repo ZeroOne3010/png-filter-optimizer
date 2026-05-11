@@ -11,10 +11,6 @@ on:
         description: "Post sticky PR comment (true/false)"
         required: false
         default: "false"
-      pr_number:
-        description: "PR number for optional sticky comment"
-        required: false
-        default: ""
 
 permissions:
   contents: read
@@ -75,10 +71,23 @@ jobs:
             build/jmh-results/**
           if-no-files-found: warn
 
+      - name: Resolve PR context for sticky comment
+        id: pr_context
+        if: ${{ github.event.inputs.sticky_pr_comment == 'true' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const head = `${owner}:${context.ref.replace('refs/heads/', '')}`;
+            const { data: prs } = await github.rest.pulls.list({ owner, repo, state: 'open', head });
+            const prNumber = prs.length > 0 ? String(prs[0].number) : '';
+            core.info(prNumber ? `Resolved PR #${prNumber} for head ${head}` : `No open PR found for head ${head}`);
+            core.setOutput('pr_number', prNumber);
+
       - name: Sticky PR comment
-        if: ${{ github.event.inputs.sticky_pr_comment == 'true' && github.event.inputs.pr_number != '' }}
+        if: ${{ github.event.inputs.sticky_pr_comment == 'true' && steps.pr_context.outputs.pr_number != '' }}
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: png-corpus-benchmark
-          number: ${{ github.event.inputs.pr_number }}
+          number: ${{ steps.pr_context.outputs.pr_number }}
           path: build/reports/pngfilteropt/benchmark.md
