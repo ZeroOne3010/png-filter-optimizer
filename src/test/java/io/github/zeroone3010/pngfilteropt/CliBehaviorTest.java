@@ -8,6 +8,8 @@ import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class CliBehaviorTest {
@@ -42,8 +44,10 @@ class CliBehaviorTest {
         String mdText = Files.readString(md);
         String jsonText = Files.readString(json);
         assertTrue(mdText.contains("| image | original | fixed-none | sumabs | best |"));
-        assertTrue(jsonText.contains("best_vs_original_pct"));
-        assertTrue(jsonText.contains("best_vs_sumabs_pct"));
-        assertTrue(jsonText.contains("best_vs_zopflipng_default_pct"));
+        var json = new ObjectMapper().readTree(jsonText);
+        assertTrue(json.has("images"));
+        assertTrue(json.get("summary").has("best_vs_original_pct"));
+        assertTrue(json.get("summary").has("best_vs_sumabs_pct"));
+        assertTrue(json.get("summary").has("best_vs_zopflipng_default_pct"));
     }
 }
