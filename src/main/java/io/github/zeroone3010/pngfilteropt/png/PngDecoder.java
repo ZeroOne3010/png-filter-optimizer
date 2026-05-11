@@ -8,11 +8,12 @@ import java.util.List;
 
 public final class PngDecoder {
     public RawImage decode(Path path) {
-        try (PngReaderByte reader = new PngReaderByte(path.toFile())) {
+        PngReaderByte reader = new PngReaderByte(path.toFile());
+        try {
             var info = reader.imgInfo;
             List<byte[]> rows = new ArrayList<>(info.rows);
             for (int y = 0; y < info.rows; y++) {
-                rows.add(reader.readRowByte(y).getScanline().clone());
+                rows.add(reader.readRowByte().getScanline().clone());
             }
             return new RawImage(
                     info.cols,
@@ -23,6 +24,8 @@ public final class PngDecoder {
                     info.bytesPerRow,
                     rows
             );
+        } finally {
+            reader.end();
         }
     }
 

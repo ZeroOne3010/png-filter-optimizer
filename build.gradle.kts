@@ -21,7 +21,7 @@ application {
 
 dependencies {
     implementation("info.picocli:picocli:4.7.7")
-    implementation("com.github.leonbloy:pngj:2.1.0")
+    implementation("ar.com.hjg:pngj:2.1.0")
     implementation("it.unimi.dsi:fastutil:8.5.18")
 
     testImplementation(platform("org.junit:junit-bom:5.11.4"))

@@ -1,0 +1,93 @@
+name: PNG Corpus Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      corpus_path:
+        description: "Path to PNG corpus directory in repository/workspace"
+        required: true
+        default: "corpus"
+      sticky_pr_comment:
+        description: "Post sticky PR comment (true/false)"
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 26 (Temurin) with Gradle cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '26'
+          cache: gradle
+
+      - name: Install zopfli
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zopfli
+
+      - name: Build
+        run: ./gradlew --no-daemon build
+
+      - name: Test
+        run: ./gradlew --no-daemon test
+
+      - name: JMH benchmarks
+        run: |
+          if [ -d src/jmh ] && find src/jmh -type f -name "*.java" -print -quit | grep -q .; then
+            ./gradlew --no-daemon jmh
+          else
+            echo "No JMH benchmarks found under src/jmh; skipping jmh task."
+          fi
+
+      - name: Run PNG corpus benchmark
+        run: |
+          mkdir -p build/reports/pngfilteropt
+          ./gradlew --no-daemon run --args="benchmark ${{ github.event.inputs.corpus_path }} --markdown build/reports/pngfilteropt/benchmark.md --json build/reports/pngfilteropt/benchmark.json"
+
+      - name: Append benchmark summary
+        run: cat build/reports/pngfilteropt/benchmark.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload benchmark artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: png-corpus-benchmark-artifacts
+          path: |
+            build/reports/pngfilteropt/benchmark.md
+            build/reports/pngfilteropt/benchmark.json
+            build/reports/**
+            build/test-results/**
+            build/jmh-results/**
+          if-no-files-found: warn
+
+      - name: Resolve PR context for sticky comment
+        id: pr_context
+        if: ${{ github.event.inputs.sticky_pr_comment == 'true' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const head = `${owner}:${context.ref.replace('refs/heads/', '')}`;
+            const { data: prs } = await github.rest.pulls.list({ owner, repo, state: 'open', head });
+            const prNumber = prs.length > 0 ? String(prs[0].number) : '';
+            core.info(prNumber ? `Resolved PR #${prNumber} for head ${head}` : `No open PR found for head ${head}`);
+            core.setOutput('pr_number', prNumber);
+
+      - name: Sticky PR comment
+        if: ${{ github.event.inputs.sticky_pr_comment == 'true' && steps.pr_context.outputs.pr_number != '' }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: png-corpus-benchmark
+          number: ${{ steps.pr_context.outputs.pr_number }}
+          path: build/reports/pngfilteropt/benchmark.md
