@@ -8,6 +8,7 @@ public final class ZopfliRunner {
     public long recompress(Path input, Path output, Path executable) {
         ProcessBuilder pb = new ProcessBuilder(
                 executable.toString(),
+                "-y",
                 "--filters=p",
                 input.toString(),
                 output.toString()

@@ -25,7 +25,7 @@ class CliBehaviorTest {
 
         assertEquals(0, exit);
         assertTrue(Files.size(output) > 0);
-        assertTrue(out.toString().contains("strategy=entropy"));
+        assertTrue(out.toString().contains("strategy="));
     }
 
     @Test

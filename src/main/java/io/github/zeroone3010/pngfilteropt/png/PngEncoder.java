@@ -32,6 +32,15 @@ public final class PngEncoder {
         ihdr.write(0);
         ihdr.write(0);
         writeChunk(png, "IHDR", ihdr.toByteArray());
+        if (image.source().colorType() == 3) {
+            if (image.source().paletteRgb() == null || image.source().paletteRgb().length == 0) {
+                throw new IllegalStateException("Indexed-color PNG requires PLTE palette data");
+            }
+            writeChunk(png, "PLTE", image.source().paletteRgb());
+            if (image.source().transparencyAlpha() != null && image.source().transparencyAlpha().length > 0) {
+                writeChunk(png, "tRNS", image.source().transparencyAlpha());
+            }
+        }
 
         ByteArrayOutputStream raw = new ByteArrayOutputStream();
         for (FilteredRow row : image.rows()) {

@@ -4,10 +4,11 @@ import io.github.zeroone3010.pngfilteropt.filter.CandidateGenerator;
 import io.github.zeroone3010.pngfilteropt.filter.PngFilter;
 import io.github.zeroone3010.pngfilteropt.optimize.EntropyOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FilterOptimizer;
-import io.github.zeroone3010.pngfilteropt.optimize.FixedFilterOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.LzBeamOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.SumAbsOptimizer;
 import io.github.zeroone3010.pngfilteropt.png.FilteredImage;
+import io.github.zeroone3010.pngfilteropt.png.FilterInspector;
+import io.github.zeroone3010.pngfilteropt.png.FilteredRow;
 import io.github.zeroone3010.pngfilteropt.png.PngDecoder;
 import io.github.zeroone3010.pngfilteropt.png.PngEncoder;
 import io.github.zeroone3010.pngfilteropt.zopfli.ZopfliRunner;
@@ -52,6 +53,7 @@ public final class OptimizeCommand implements Runnable {
         var decoder = new PngDecoder();
         var encoder = new PngEncoder();
         var candidates = new CandidateGenerator();
+        var inspector = new FilterInspector();
 
         var raw = decoder.decode(input);
         List<CliOptions.OptimizerName> selected = optimizerSelection.tryAll
@@ -59,7 +61,6 @@ public final class OptimizeCommand implements Runnable {
                 : Arrays.asList(optimizerSelection.optimizers);
 
         Map<CliOptions.OptimizerName, FilterOptimizer> optimizers = Map.of(
-                CliOptions.OptimizerName.BASELINE, new FixedFilterOptimizer(PngFilter.NONE),
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(),
                 CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
                 CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer()
@@ -71,8 +72,23 @@ public final class OptimizeCommand implements Runnable {
         Path primaryOutput = output;
 
         for (CliOptions.OptimizerName name : selected) {
-            FilterOptimizer optimizer = optimizers.get(name);
-            FilteredImage candidate = optimizer.optimize(raw, candidates);
+            FilteredImage candidate;
+            if (name == CliOptions.OptimizerName.BASELINE) {
+                var inputFilters = inspector.listFilters(input, raw);
+                List<FilteredRow> rows = new java.util.ArrayList<>(raw.height());
+                for (int y = 0; y < raw.height(); y++) {
+                    PngFilter originalFilter = inputFilters.get(y);
+                    var row = candidates.generateCandidates(raw, y).stream()
+                            .filter(c -> c.filter() == originalFilter)
+                            .findFirst()
+                            .orElseThrow();
+                    rows.add(row);
+                }
+                candidate = new FilteredImage(raw, rows);
+            } else {
+                FilterOptimizer optimizer = optimizers.get(name);
+                candidate = optimizer.optimize(raw, candidates);
+            }
             encoder.encode(candidate, primaryOutput);
             long size;
             try {
