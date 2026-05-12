@@ -26,6 +26,7 @@ Pipeline:
 - `entropy` — chooses per-row filters using Shannon entropy heuristics.
 - `adaptive` — uses a dynamic-programming style global optimization strategy.
 - `exhaustive` — searches filter combinations up to the configured `--beam` width.
+- `literal` — always uses filter `0` (`NONE`) for every row (no prediction).
 
 ## Quick examples
 

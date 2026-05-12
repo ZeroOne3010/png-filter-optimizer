@@ -20,7 +20,8 @@ public final class CliOptions {
                         "  baseline  - Preserves current filter strategy and only recompresses.",
                         "  entropy   - Chooses per-row filters by Shannon entropy heuristics.",
                         "  adaptive  - Uses dynamic programming to optimize global compressed size.",
-                        "  exhaustive- Evaluates all filter sequences up to --beam width."
+                        "  exhaustive- Evaluates all filter sequences up to --beam width.",
+                        "  literal   - Forces filter 0 (NONE) for every row."
                 }
         )
         public OptimizerName[] optimizers = {OptimizerName.ADAPTIVE};
@@ -51,6 +52,7 @@ public final class CliOptions {
         BASELINE,
         ENTROPY,
         ADAPTIVE,
-        EXHAUSTIVE
+        EXHAUSTIVE,
+        LITERAL
     }
 }
