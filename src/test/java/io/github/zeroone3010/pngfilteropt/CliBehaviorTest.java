@@ -115,4 +115,23 @@ class CliBehaviorTest {
         assertTrue(out.toString().contains("running_strategies=original, adaptive, fixed-none"));
     }
 
+
+
+    @Test
+    void benchmarkWithZopfliPrintsZopfliInStrategyLine() throws Exception {
+        Path root = Files.createTempDirectory("png-bench-z");
+        TestPngFixtures.createPng(root.resolve("one.png"), 1, 1);
+        Path script = Files.createTempFile("fake-zopfli-bench", ".sh");
+        Files.writeString(script, "#!/usr/bin/env bash\nset -euo pipefail\ncp \"$3\" \"$4\"\n");
+        script.toFile().setExecutable(true);
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .setOut(new java.io.PrintWriter(out, true))
+                .execute("benchmark", root.toString(), "--zopflipng", script.toString());
+
+        assertEquals(0, exit);
+        assertTrue(out.toString().contains("running_strategies=original, adaptive, fixed-none, zopflipng-default"));
+    }
+
 }
