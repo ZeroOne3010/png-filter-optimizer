@@ -33,7 +33,11 @@ public final class PngDecoder {
                 }
                 PngChunkTRNS trnsChunk = reader.getMetadata().getTRNS();
                 if (trnsChunk != null && trnsChunk.getPalletteAlpha() != null) {
-                    trns = trnsChunk.getPalletteAlpha().clone();
+                    int[] alpha = trnsChunk.getPalletteAlpha();
+                    trns = new byte[alpha.length];
+                    for (int i = 0; i < alpha.length; i++) {
+                        trns[i] = (byte) (alpha[i] & 0xFF);
+                    }
                 }
             }
 
