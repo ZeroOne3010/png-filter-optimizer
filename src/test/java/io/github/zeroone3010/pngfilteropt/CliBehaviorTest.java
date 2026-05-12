@@ -21,6 +21,7 @@ class CliBehaviorTest {
 
         int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
                 .setOut(new java.io.PrintWriter(out, true))
+                .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute("optimize", input.toString(), output.toString(), "--optimizer", "entropy");
 
         assertEquals(0, exit);
