@@ -26,13 +26,13 @@ class RunOptimizerTest {
     @Test
     void prefersRunHeavyUpCandidateOnRepeatedRow() {
         RawImage image = rawImage(8, 2, List.of(
-                new byte[]{1, 2, 3, 4, 5, 6, 7, 8},
-                new byte[]{1, 2, 3, 4, 5, 6, 7, 8}
+                new byte[]{9, 9, 9, 9, 9, 9, 9, 9},
+                new byte[]{9, 9, 9, 9, 9, 9, 9, 9}
         ));
 
         var out = optimizer.optimize(image, candidates);
 
-        assertEquals(PngFilter.SUB, out.rows().get(0).filter());
+        assertEquals(PngFilter.NONE, out.rows().get(0).filter());
         assertEquals(PngFilter.UP, out.rows().get(1).filter());
     }
 

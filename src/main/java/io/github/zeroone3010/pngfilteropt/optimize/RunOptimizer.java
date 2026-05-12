@@ -56,6 +56,6 @@ public final class RunOptimizer implements FilterOptimizer {
         // length 3 -> +4
         // length 4+ -> +1
         // This makes many short runs expensive while long runs remain cheap.
-        return runLength >= 4 ? 1 : 1 << (4 - runLength);
+        return runLength >= 4 ? 1 : 1 << (5 - runLength);
     }
 }
