@@ -86,10 +86,12 @@ class CliBehaviorTest {
 
         Path md = Files.createTempFile("bench", ".md");
         Path jsonPath = Files.createTempFile("bench", ".json");
-        int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main()).execute(
-                "benchmark", root.toString(), "--try-all", "--markdown", md.toString(), "--json", jsonPath.toString()
-        );
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .setOut(new java.io.PrintWriter(out, true))
+                .execute("benchmark", root.toString(), "--try-all", "--markdown", md.toString(), "--json", jsonPath.toString());
         assertEquals(0, exit);
+        assertTrue(out.toString().contains("running_strategies=original, baseline, entropy, adaptive, exhaustive, literal, fixed-none"));
         String mdText = Files.readString(md);
         String jsonText = Files.readString(jsonPath);
         assertTrue(mdText.contains("| image | original | baseline | entropy | adaptive | exhaustive | literal | fixed-none | best |"));
@@ -99,4 +101,18 @@ class CliBehaviorTest {
         assertTrue(json.get("summary").has("best_vs_sumabs_pct"));
         assertTrue(json.get("summary").has("best_vs_zopflipng_default_pct"));
     }
+    @Test
+    void benchmarkDefaultPrintsAdaptiveStrategyLine() throws Exception {
+        Path root = Files.createTempDirectory("png-bench-default");
+        TestPngFixtures.createPng(root.resolve("one.png"), 1, 1);
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .setOut(new java.io.PrintWriter(out, true))
+                .execute("benchmark", root.toString());
+
+        assertEquals(0, exit);
+        assertTrue(out.toString().contains("running_strategies=original, adaptive, fixed-none"));
+    }
+
 }

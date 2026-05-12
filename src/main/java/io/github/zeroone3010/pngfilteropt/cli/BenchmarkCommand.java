@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Arrays;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.DeflaterOutputStream;
 
@@ -55,6 +56,7 @@ public final class BenchmarkCommand implements Runnable {
         var candidates = new CandidateGenerator();
         var inspector = new FilterInspector();
         var selected = optimizerSelection.tryAll ? List.of(CliOptions.OptimizerName.values()) : Arrays.asList(optimizerSelection.optimizers);
+        spec.commandLine().getOut().printf("running_strategies=%s\n", describeStrategies(selected));
         Map<CliOptions.OptimizerName, FilterOptimizer> optimizers = Map.of(
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(),
                 CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
@@ -168,6 +170,13 @@ public final class BenchmarkCommand implements Runnable {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize benchmark report JSON", e);
         }
+    }
+
+    private static String describeStrategies(List<CliOptions.OptimizerName> selected) {
+        var names = selected.stream()
+                .map(name -> name.name().toLowerCase())
+                .collect(Collectors.joining(", "));
+        return "original, " + names + ", fixed-none";
     }
 
     private static void writeIfRequested(Path output, String content) {

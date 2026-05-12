@@ -53,7 +53,7 @@ jobs:
       - name: Run PNG corpus benchmark
         run: |
           mkdir -p build/reports/pngfilteropt
-          ./gradlew --no-daemon run --args="benchmark ${{ github.event.inputs.corpus_path }} --markdown build/reports/pngfilteropt/benchmark.md --json build/reports/pngfilteropt/benchmark.json"
+          ./gradlew --no-daemon run --args="benchmark ${{ github.event.inputs.corpus_path }} --try-all --markdown build/reports/pngfilteropt/benchmark.md --json build/reports/pngfilteropt/benchmark.json"
 
       - name: Append benchmark summary
         run: cat build/reports/pngfilteropt/benchmark.md >> "$GITHUB_STEP_SUMMARY"

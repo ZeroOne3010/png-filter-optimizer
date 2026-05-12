@@ -28,6 +28,12 @@ Pipeline:
 - `exhaustive` — searches filter combinations up to the configured `--beam` width.
 - `literal` — always uses filter `0` (`NONE`) for every row (no prediction).
 
+## Benchmark behavior
+
+- By default, `benchmark` runs only `adaptive` unless you pass `--optimizer` or `--try-all`.
+- `fixed-none` is always included in benchmark output as a reference column.
+- `--try-all` runs all optimizer names: `baseline`, `entropy`, `adaptive`, `exhaustive`, `literal`.
+
 ## Quick examples
 
 ```bash
