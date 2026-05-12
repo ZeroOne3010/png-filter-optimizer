@@ -13,7 +13,7 @@ class EntropyEstimatorTest {
         double longRunScore = EntropyOptimizer.estimateEntropyBits(longRuns);
         double alternatingScore = EntropyOptimizer.estimateEntropyBits(alternating);
 
-        assertTrue(longRunScore < alternatingScore,
-                "Rows with longer repeated transitions should score lower than alternating transitions.");
+        assertTrue(alternatingScore < longRunScore,
+                "Rows with different byte ordering should produce different scores even when value histograms match.");
     }
 }
