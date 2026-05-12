@@ -87,12 +87,12 @@ class CliBehaviorTest {
         Path md = Files.createTempFile("bench", ".md");
         Path jsonPath = Files.createTempFile("bench", ".json");
         int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main()).execute(
-                "benchmark", root.toString(), "--markdown", md.toString(), "--json", jsonPath.toString()
+                "benchmark", root.toString(), "--try-all", "--markdown", md.toString(), "--json", jsonPath.toString()
         );
         assertEquals(0, exit);
         String mdText = Files.readString(md);
         String jsonText = Files.readString(jsonPath);
-        assertTrue(mdText.contains("| image | original | fixed-none | sumabs | best |"));
+        assertTrue(mdText.contains("| image | original | baseline | entropy | adaptive | exhaustive | literal | fixed-none | best |"));
         var json = new ObjectMapper().readTree(jsonText);
         assertTrue(json.has("images"));
         assertTrue(json.get("summary").has("best_vs_original_pct"));
