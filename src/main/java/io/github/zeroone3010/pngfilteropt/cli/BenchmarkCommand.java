@@ -58,7 +58,7 @@ public final class BenchmarkCommand implements Runnable {
         Map<CliOptions.OptimizerName, FilterOptimizer> optimizers = Map.of(
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(),
                 CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
-                CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(optimizerSelection.beamWidth),
+                CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(),
                 CliOptions.OptimizerName.LITERAL, new LiteralOptimizer()
         );
 
@@ -95,7 +95,8 @@ public final class BenchmarkCommand implements Runnable {
             images.add(Map.of("image", directory.relativize(png).toString(), "strategies", strategies, "best", best.getKey()));
             originalTotal += original;
             bestTotal += best.getValue();
-            sumabsTotal += strategies.getOrDefault("adaptive", original);
+            long adaptiveBaseline = estimateDeflatedSize(new SumAbsOptimizer().optimize(raw, candidates));
+            sumabsTotal += adaptiveBaseline;
             if (zopflipngTotal != null) zopflipngTotal += strategies.get("zopflipng-default");
         }
 
