@@ -12,10 +12,10 @@ import java.util.List;
 /**
  * Chooses a per-row filter by estimating Shannon coding cost.
  *
- * <p>The estimate combines:
+ * <p>Each candidate row is scored from row-local histograms:
  * <ul>
  *   <li>0th-order byte entropy (value histogram), and</li>
- *   <li>1st-order transition entropy (bigram histogram) to include byte order effects.</li>
+ *   <li>1st-order transition entropy (bigram histogram) to include byte-order effects.</li>
  * </ul>
  * Lower estimated entropy generally implies lower DEFLATE coding cost.
  */
@@ -45,7 +45,10 @@ public final class EntropyOptimizer implements FilterOptimizer {
 
     /**
      * Shannon-entropy estimate (bits) for one row.
-     * Uses value histogram + transition histogram so rows with equal byte counts but different order can score differently.
+     *
+     * <p>Scoring is histogram-based and row-local:
+     * value histogram cost + transition histogram cost.
+     * Rows with equal byte counts but different order can therefore score differently.
      */
     static double estimateEntropyBits(byte[] row) {
         if (row.length == 0) {
