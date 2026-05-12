@@ -4,9 +4,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.zeroone3010.pngfilteropt.filter.CandidateGenerator;
 import io.github.zeroone3010.pngfilteropt.filter.PngFilter;
+import io.github.zeroone3010.pngfilteropt.optimize.EntropyOptimizer;
+import io.github.zeroone3010.pngfilteropt.optimize.FilterOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FixedFilterOptimizer;
+import io.github.zeroone3010.pngfilteropt.optimize.LiteralOptimizer;
+import io.github.zeroone3010.pngfilteropt.optimize.LzBeamOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.SumAbsOptimizer;
 import io.github.zeroone3010.pngfilteropt.png.FilteredImage;
+import io.github.zeroone3010.pngfilteropt.png.FilterInspector;
+import io.github.zeroone3010.pngfilteropt.png.FilteredRow;
 import io.github.zeroone3010.pngfilteropt.png.PngDecoder;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
@@ -24,6 +30,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
 import java.util.stream.Stream;
 import java.util.zip.DeflaterOutputStream;
 
@@ -32,7 +39,8 @@ public final class BenchmarkCommand implements Runnable {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     @Spec CommandSpec spec;
-    @Parameters(index = "0", paramLabel = "directory", description = "Directory containing PNGs to benchmark.") Path directory;
+    @Parameters(index = "0", arity = "0..1", paramLabel = "directory", defaultValue = "src/test/resources/test-images",
+            description = "Directory containing PNGs to benchmark.") Path directory;
     @Mixin CliOptions.OptimizerSelection optimizerSelection;
     @Option(names = "--markdown", paramLabel = "PATH", description = "Optional path to write a Markdown benchmark summary.") Path markdownOutput;
     @Option(names = "--json", paramLabel = "PATH", description = "Optional path to write raw benchmark results as JSON.") Path jsonOutput;
@@ -45,14 +53,40 @@ public final class BenchmarkCommand implements Runnable {
         Long zopflipngTotal = optimizerSelection.zopflipngPath != null ? 0L : null;
         var decoder = new PngDecoder();
         var candidates = new CandidateGenerator();
+        var inspector = new FilterInspector();
+        var selected = optimizerSelection.tryAll ? List.of(CliOptions.OptimizerName.values()) : Arrays.asList(optimizerSelection.optimizers);
+        Map<CliOptions.OptimizerName, FilterOptimizer> optimizers = Map.of(
+                CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(),
+                CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
+                CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(optimizerSelection.beamWidth),
+                CliOptions.OptimizerName.LITERAL, new LiteralOptimizer()
+        );
 
         for (Path png : pngs) {
             long original = fileSize(png);
             var raw = decoder.decode(png);
             Map<String, Long> strategies = new LinkedHashMap<>();
             strategies.put("original", original);
+
+            for (CliOptions.OptimizerName name : selected) {
+                FilteredImage optimized;
+                String key = name.name().toLowerCase();
+                if (name == CliOptions.OptimizerName.BASELINE) {
+                    var inputFilters = inspector.listFilters(png, raw);
+                    List<FilteredRow> rows = new ArrayList<>(raw.height());
+                    for (int y = 0; y < raw.height(); y++) {
+                        PngFilter originalFilter = inputFilters.get(y);
+                        var row = candidates.generateCandidates(raw, y).stream().filter(c -> c.filter() == originalFilter).findFirst().orElseThrow();
+                        rows.add(row);
+                    }
+                    optimized = new FilteredImage(raw, rows);
+                } else {
+                    optimized = optimizers.get(name).optimize(raw, candidates);
+                }
+                strategies.put(key, estimateDeflatedSize(optimized));
+            }
+
             strategies.put("fixed-none", estimateDeflatedSize(new FixedFilterOptimizer(PngFilter.NONE).optimize(raw, candidates)));
-            strategies.put("sumabs", estimateDeflatedSize(new SumAbsOptimizer().optimize(raw, candidates)));
             if (optimizerSelection.zopflipngPath != null) {
                 strategies.put("zopflipng-default", original);
             }
@@ -61,7 +95,7 @@ public final class BenchmarkCommand implements Runnable {
             images.add(Map.of("image", directory.relativize(png).toString(), "strategies", strategies, "best", best.getKey()));
             originalTotal += original;
             bestTotal += best.getValue();
-            sumabsTotal += strategies.get("sumabs");
+            sumabsTotal += strategies.getOrDefault("adaptive", original);
             if (zopflipngTotal != null) zopflipngTotal += strategies.get("zopflipng-default");
         }
 
@@ -102,10 +136,22 @@ public final class BenchmarkCommand implements Runnable {
     }
 
     private static String renderMarkdown(List<Map<String, Object>> images) {
-        StringBuilder sb = new StringBuilder("| image | original | fixed-none | sumabs | best |\n|---|---:|---:|---:|---|\n");
+        if (images.isEmpty()) {
+            return "| image | original | best |\n|---|---:|---|\n";
+        }
+        @SuppressWarnings("unchecked") Map<String, Long> first = (Map<String, Long>) images.get(0).get("strategies");
+        List<String> columns = new ArrayList<>(first.keySet());
+        columns.remove("original");
+        StringBuilder sb = new StringBuilder("| image | original");
+        for (String column : columns) sb.append(" | ").append(column);
+        sb.append(" | best |\n|---|---:");
+        for (int i = 0; i < columns.size(); i++) sb.append("|---:");
+        sb.append("|---|\n");
         for (Map<String, Object> image : images) {
             @SuppressWarnings("unchecked") Map<String, Long> s = (Map<String, Long>) image.get("strategies");
-            sb.append("| ").append(image.get("image")).append(" | ").append(s.get("original")).append(" | ").append(s.get("fixed-none")).append(" | ").append(s.get("sumabs")).append(" | ").append(image.get("best")).append(" |\n");
+            sb.append("| ").append(image.get("image")).append(" | ").append(s.get("original"));
+            for (String column : columns) sb.append(" | ").append(s.get(column));
+            sb.append(" | ").append(image.get("best")).append(" |\n");
         }
         return sb.toString();
     }
