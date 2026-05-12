@@ -7,7 +7,6 @@ import io.github.zeroone3010.pngfilteropt.png.FilteredRow;
 import io.github.zeroone3010.pngfilteropt.png.RawImage;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 public final class SumAbsOptimizer implements FilterOptimizer {
@@ -19,14 +18,27 @@ public final class SumAbsOptimizer implements FilterOptimizer {
         List<FilteredRow> rows = new ArrayList<>(image.height());
         for (int y = 0; y < image.height(); y++) {
             var all = candidates.generateCandidates(image, y);
-            rows.add(all.stream().min(Comparator.comparingInt(this::score)).orElse(new FilteredRow(y, PngFilter.NONE, image.rows().get(y))));
+            FilteredRow best = new FilteredRow(y, PngFilter.NONE, image.rows().get(y));
+            int bestScore = Integer.MAX_VALUE;
+            for (FilteredRow candidate : all) {
+                int candidateScore = score(candidate);
+                if (candidateScore < bestScore || (candidateScore == bestScore
+                        && candidate.filter().pngValue() < best.filter().pngValue())) {
+                    best = candidate;
+                    bestScore = candidateScore;
+                }
+            }
+            rows.add(best);
         }
         return new FilteredImage(image, rows);
     }
 
     private int score(FilteredRow row) {
         int score = 0;
-        for (byte b : row.filteredBytes()) score += Math.abs((int) b);
+        for (byte b : row.filteredBytes()) {
+            int unsigned = Byte.toUnsignedInt(b);
+            score += Math.min(unsigned, 256 - unsigned);
+        }
         return score;
     }
 }
