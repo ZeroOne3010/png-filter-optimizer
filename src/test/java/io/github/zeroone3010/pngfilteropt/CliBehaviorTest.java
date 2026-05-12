@@ -14,6 +14,55 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CliBehaviorTest {
     @Test
+    void optimizeRunsNamedOptimizerAndWritesOutput() throws Exception {
+        Path input = TestPngFixtures.createPng(Files.createTempFile("opt", ".png"), 2, 2);
+        Path output = Files.createTempFile("opt-out", ".png");
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .setOut(new java.io.PrintWriter(out, true))
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute("optimize", input.toString(), output.toString(), "--optimizer", "entropy");
+
+        assertEquals(0, exit);
+        assertTrue(Files.size(output) > 0);
+        assertTrue(out.toString().contains("strategy="));
+    }
+
+    @Test
+    void optimizeTryAllChoosesStrategyAndPrintsSummary() throws Exception {
+        Path input = TestPngFixtures.createPng(Files.createTempFile("opt-all", ".png"), 3, 2);
+        Path output = Files.createTempFile("opt-all-out", ".png");
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .setOut(new java.io.PrintWriter(out, true))
+                .execute("optimize", input.toString(), output.toString(), "--try-all", "--beam", "8");
+
+        assertEquals(0, exit);
+        assertTrue(Files.size(output) > 0);
+        assertTrue(out.toString().contains("output_bytes="));
+    }
+
+    @Test
+    void optimizeWithZopfliKeepsSmallerResult() throws Exception {
+        Path input = TestPngFixtures.createPng(Files.createTempFile("opt-z", ".png"), 3, 3);
+        Path output = Files.createTempFile("opt-z-out", ".png");
+        Path script = Files.createTempFile("fake-zopfli", ".sh");
+        Files.writeString(script, "#!/usr/bin/env bash\nset -euo pipefail\ncp \"$3\" \"$4\"\ntruncate -s 20 \"$4\"\n");
+        script.toFile().setExecutable(true);
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .setOut(new java.io.PrintWriter(out, true))
+                .execute("optimize", input.toString(), output.toString(), "--zopflipng", script.toString());
+
+        assertEquals(0, exit);
+        assertEquals(20, Files.size(output));
+        assertTrue(out.toString().contains("zopfli_bytes=20"));
+    }
+
+    @Test
     void inspectOutputsRowFilterCsv() throws Exception {
         Path png = TestPngFixtures.createPng(Files.createTempFile("inspect", ".png"), 1, 1);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
