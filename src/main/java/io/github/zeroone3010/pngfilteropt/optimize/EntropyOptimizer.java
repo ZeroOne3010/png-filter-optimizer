@@ -7,11 +7,16 @@ import io.github.zeroone3010.pngfilteropt.png.FilteredRow;
 import io.github.zeroone3010.pngfilteropt.png.RawImage;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 /**
- * Chooses a per-row filter by estimating Shannon entropy from the row byte histogram.
+ * Chooses a per-row filter by estimating Shannon coding cost.
+ *
+ * <p>The estimate combines:
+ * <ul>
+ *   <li>0th-order byte entropy (value histogram), and</li>
+ *   <li>1st-order transition entropy (bigram histogram) to include byte order effects.</li>
+ * </ul>
  * Lower estimated entropy generally implies lower DEFLATE coding cost.
  */
 public final class EntropyOptimizer implements FilterOptimizer {
@@ -39,26 +44,51 @@ public final class EntropyOptimizer implements FilterOptimizer {
     }
 
     /**
-     * Histogram-based Shannon entropy estimate (bits) for one row.
-     * This computes: sum(count * -log2(count/length)) over all byte values.
+     * Shannon-entropy estimate (bits) for one row.
+     * Uses value histogram + transition histogram so rows with equal byte counts but different order can score differently.
      */
     static double estimateEntropyBits(byte[] row) {
         if (row.length == 0) {
             return 0.0d;
         }
 
+        double valueBits = estimateValueEntropyBits(row);
+        double transitionBits = estimateTransitionEntropyBits(row);
+        return valueBits + transitionBits;
+    }
+
+    private static double estimateValueEntropyBits(byte[] row) {
         int[] histogram = new int[256];
         for (byte b : row) {
             histogram[Byte.toUnsignedInt(b)]++;
         }
 
-        double length = row.length;
+        return entropyBitsFromHistogram(histogram, row.length);
+    }
+
+    private static double estimateTransitionEntropyBits(byte[] row) {
+        if (row.length < 2) {
+            return 0.0d;
+        }
+
+        int[] bigramHistogram = new int[256 * 256];
+        for (int i = 1; i < row.length; i++) {
+            int prev = Byte.toUnsignedInt(row[i - 1]);
+            int curr = Byte.toUnsignedInt(row[i]);
+            bigramHistogram[(prev << 8) | curr]++;
+        }
+
+        return entropyBitsFromHistogram(bigramHistogram, row.length - 1);
+    }
+
+    private static double entropyBitsFromHistogram(int[] histogram, int sampleCount) {
+        double total = sampleCount;
         double bits = 0.0d;
         for (int count : histogram) {
             if (count == 0) {
                 continue;
             }
-            double probability = count / length;
+            double probability = count / total;
             bits += count * (-log2(probability));
         }
         return bits;
