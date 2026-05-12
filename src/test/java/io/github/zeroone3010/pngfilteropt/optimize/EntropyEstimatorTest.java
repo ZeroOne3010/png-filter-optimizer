@@ -6,6 +6,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntropyEstimatorTest {
     @Test
+    void prefersLowEntropyRowsOverHighEntropyRows() {
+        byte[] lowEntropy = new byte[]{7, 7, 7, 7, 7, 7, 7, 7};
+        byte[] highEntropy = new byte[]{0, 1, 2, 3, 4, 5, 6, 7};
+
+        double lowEntropyScore = EntropyOptimizer.estimateEntropyBits(lowEntropy);
+        double highEntropyScore = EntropyOptimizer.estimateEntropyBits(highEntropy);
+
+        assertTrue(lowEntropyScore < highEntropyScore,
+                "Low-entropy synthetic rows should receive a smaller estimated cost.");
+    }
+
+    @Test
     void distinguishesRowsWithSameValueHistogramButDifferentOrdering() {
         byte[] longRuns = new byte[]{1, 1, 1, 1, 2, 2, 2, 2};
         byte[] alternating = new byte[]{1, 2, 1, 2, 1, 2, 1, 2};
