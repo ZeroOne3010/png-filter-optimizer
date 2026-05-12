@@ -4,6 +4,7 @@ import io.github.zeroone3010.pngfilteropt.filter.CandidateGenerator;
 import io.github.zeroone3010.pngfilteropt.filter.PngFilter;
 import io.github.zeroone3010.pngfilteropt.optimize.EntropyOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FilterOptimizer;
+import io.github.zeroone3010.pngfilteropt.optimize.LiteralOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.LzBeamOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.SumAbsOptimizer;
 import io.github.zeroone3010.pngfilteropt.png.FilteredImage;
@@ -63,7 +64,8 @@ public final class OptimizeCommand implements Runnable {
         Map<CliOptions.OptimizerName, FilterOptimizer> optimizers = Map.of(
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(),
                 CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
-                CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer()
+                CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(),
+                CliOptions.OptimizerName.LITERAL, new LiteralOptimizer()
         );
 
         FilteredImage best = null;
