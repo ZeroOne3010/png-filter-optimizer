@@ -48,7 +48,7 @@ class CliBehaviorTest {
         Path input = TestPngFixtures.createPng(Files.createTempFile("opt-z", ".png"), 3, 3);
         Path output = Files.createTempFile("opt-z-out", ".png");
         Path script = Files.createTempFile("fake-zopfli", ".sh");
-        Files.writeString(script, "#!/usr/bin/env bash\nset -euo pipefail\ncp \"$2\" \"$3\"\ntruncate -s 20 \"$3\"\n");
+        Files.writeString(script, "#!/usr/bin/env bash\nset -euo pipefail\ncp \"$3\" \"$4\"\ntruncate -s 20 \"$4\"\n");
         script.toFile().setExecutable(true);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
