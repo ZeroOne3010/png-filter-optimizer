@@ -152,13 +152,14 @@ class CliBehaviorTest {
         Path jsonPath = Files.createTempFile("bench-diag", ".json");
 
         int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
-                .execute("benchmark", root.toString(), "--try-all", "--diagnostics", "--markdown", md.toString(), "--json", jsonPath.toString());
+                .execute("benchmark", root.toString(), "--try-all", "--diagnostics", "--diagnostics-lz-sample-step", "2", "--diagnostics-lz-max-candidates", "8", "--markdown", md.toString(), "--json", jsonPath.toString());
 
         assertEquals(0, exit);
         String mdText = Files.readString(md);
         String jsonText = Files.readString(jsonPath);
         assertTrue(mdText.contains("## Diagnostics"));
         assertTrue(mdText.contains("Filter distribution"));
+        assertTrue(mdText.contains("approximate LZ longest-match estimation"));
         var json = new ObjectMapper().readTree(jsonText);
         assertTrue(json.get("images").get(0).has("diagnostics"));
     }

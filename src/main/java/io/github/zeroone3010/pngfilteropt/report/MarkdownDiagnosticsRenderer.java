@@ -7,8 +7,9 @@ import java.util.List;
 import java.util.Map;
 
 public final class MarkdownDiagnosticsRenderer {
-    public String render(List<Map<String, Object>> images) { /* same */
+    public String render(List<Map<String, Object>> images) {
         StringBuilder sb = new StringBuilder("\n## Diagnostics\n\n");
+        sb.append("_Note: diagnostics include approximate LZ longest-match estimation (sampled hash-chain over 32 KiB lookback)._\n\n");
         for (Map<String, Object> image : images) {
             sb.append("### ").append(image.get("image")).append("\n\n");
             sb.append("Best strategy: ").append(image.get("best")).append("\n\n");
