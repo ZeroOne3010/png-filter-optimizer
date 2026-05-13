@@ -65,7 +65,11 @@ public final class OptimizeCommand implements Runnable {
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(),
                 CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
                 CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(optimizerSelection.beamWidth),
-                CliOptions.OptimizerName.FIXED_NONE, new FixedFilterOptimizer(PngFilter.NONE)
+                CliOptions.OptimizerName.FIXED_NONE, new FixedFilterOptimizer(PngFilter.NONE),
+                CliOptions.OptimizerName.FIXED_SUB, new FixedFilterOptimizer(PngFilter.SUB),
+                CliOptions.OptimizerName.FIXED_UP, new FixedFilterOptimizer(PngFilter.UP),
+                CliOptions.OptimizerName.FIXED_AVERAGE, new FixedFilterOptimizer(PngFilter.AVERAGE),
+                CliOptions.OptimizerName.FIXED_PAETH, new FixedFilterOptimizer(PngFilter.PAETH)
         );
 
         FilteredImage best = null;
