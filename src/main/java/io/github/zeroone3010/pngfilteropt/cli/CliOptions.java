@@ -28,7 +28,8 @@ public final class CliOptions {
                         "  baseline  - " + DESC_BASELINE,
                         "  entropy   - " + DESC_ENTROPY,
                         "  adaptive  - " + DESC_ADAPTIVE,
-                        "  exhaustive- " + DESC_EXHAUSTIVE
+                        "  exhaustive- " + DESC_EXHAUSTIVE,
+                        "  fixed-none- " + DESC_FIXED_NONE
                 }
         )
         public OptimizerName[] optimizers = {OptimizerName.ADAPTIVE};
@@ -59,6 +60,7 @@ public final class CliOptions {
         BASELINE,
         ENTROPY,
         ADAPTIVE,
-        EXHAUSTIVE
+        EXHAUSTIVE,
+        FIXED_NONE
     }
 }

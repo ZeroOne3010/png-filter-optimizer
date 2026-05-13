@@ -91,7 +91,7 @@ class CliBehaviorTest {
                 .setOut(new java.io.PrintWriter(out, true))
                 .execute("benchmark", root.toString(), "--try-all", "--markdown", md.toString(), "--json", jsonPath.toString());
         assertEquals(0, exit);
-        assertTrue(out.toString().contains("benchmark_columns: selected=[baseline, entropy, adaptive, exhaustive]; always-on=[original, fixed-none]"));
+        assertTrue(out.toString().contains("benchmark_columns: selected=[baseline, entropy, adaptive, exhaustive, fixed-none]; always-on=[original, fixed-none]"));
         String mdText = Files.readString(md);
         String jsonText = Files.readString(jsonPath);
         assertTrue(mdText.contains("| image | original | baseline | entropy | adaptive | exhaustive | fixed-none | best |"));
