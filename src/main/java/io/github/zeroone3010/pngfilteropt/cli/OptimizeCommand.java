@@ -64,7 +64,7 @@ public final class OptimizeCommand implements Runnable {
         Map<CliOptions.OptimizerName, FilterOptimizer> optimizers = Map.of(
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(),
                 CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
-                CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(),
+                CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(optimizerSelection.beamWidth),
                 CliOptions.OptimizerName.LITERAL, new LiteralOptimizer()
         );
 
