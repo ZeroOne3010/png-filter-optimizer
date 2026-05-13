@@ -2,6 +2,7 @@ package io.github.zeroone3010.pngfilteropt.diagnostics;
 
 import io.github.zeroone3010.pngfilteropt.filter.PngFilter;
 import io.github.zeroone3010.pngfilteropt.lz.GreedyLzEstimator;
+import io.github.zeroone3010.pngfilteropt.lz.HashChainLzHistory;
 import io.github.zeroone3010.pngfilteropt.png.FilteredImage;
 import io.github.zeroone3010.pngfilteropt.png.FilteredRow;
 
@@ -102,8 +103,8 @@ public final class DiagnosticsCalculator {
     }
 
     private long greedySavings(byte[] stream) {
-        GreedyLzEstimator estimator = new GreedyLzEstimator();
-        int encoded = estimator.estimateCompressedSize(stream);
+        GreedyLzEstimator estimator = new GreedyLzEstimator(new HashChainLzHistory());
+        int encoded = estimator.estimateCompressedCost(stream);
         return Math.max(0, stream.length - encoded);
     }
 }
