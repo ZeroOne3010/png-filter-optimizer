@@ -7,7 +7,6 @@ import io.github.zeroone3010.pngfilteropt.filter.PngFilter;
 import io.github.zeroone3010.pngfilteropt.optimize.EntropyOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FilterOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FixedFilterOptimizer;
-import io.github.zeroone3010.pngfilteropt.optimize.LiteralOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.LzBeamOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.SumAbsOptimizer;
 import io.github.zeroone3010.pngfilteropt.png.FilteredImage;
@@ -64,8 +63,7 @@ public final class BenchmarkCommand implements Runnable {
         Map<CliOptions.OptimizerName, FilterOptimizer> optimizers = Map.of(
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(),
                 CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
-                CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(),
-                CliOptions.OptimizerName.LITERAL, new LiteralOptimizer()
+                CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer()
         );
 
         for (Path png : pngs) {
@@ -179,7 +177,6 @@ public final class BenchmarkCommand implements Runnable {
             case "entropy" -> CliOptions.DESC_ENTROPY;
             case "adaptive" -> CliOptions.DESC_ADAPTIVE;
             case "exhaustive" -> CliOptions.DESC_EXHAUSTIVE;
-            case "literal" -> CliOptions.DESC_LITERAL;
             case "fixed-none" -> CliOptions.DESC_FIXED_NONE;
             case "zopflipng-default" -> CliOptions.DESC_ZOPFLIPNG_DEFAULT;
             case "best" -> CliOptions.DESC_BEST;

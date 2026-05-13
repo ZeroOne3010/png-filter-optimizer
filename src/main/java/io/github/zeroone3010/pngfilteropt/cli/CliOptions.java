@@ -9,7 +9,6 @@ public final class CliOptions {
     public static final String DESC_ENTROPY = "Chooses per-row filters by Shannon entropy heuristics.";
     public static final String DESC_ADAPTIVE = "Uses dynamic programming to optimize global compressed size.";
     public static final String DESC_EXHAUSTIVE = "Evaluates all filter sequences up to --beam width.";
-    public static final String DESC_LITERAL = "Forces filter 0 (NONE) for every row.";
     public static final String DESC_FIXED_NONE = "Forces filter 0 (NONE) for every row as a fixed reference column.";
     public static final String DESC_ORIGINAL = "Original input PNG size without re-filtering.";
     public static final String DESC_ZOPFLIPNG_DEFAULT = "Original PNG size used as placeholder for default zopflipng recompression baseline.";
@@ -29,8 +28,7 @@ public final class CliOptions {
                         "  baseline  - " + DESC_BASELINE,
                         "  entropy   - " + DESC_ENTROPY,
                         "  adaptive  - " + DESC_ADAPTIVE,
-                        "  exhaustive- " + DESC_EXHAUSTIVE,
-                        "  literal   - " + DESC_LITERAL
+                        "  exhaustive- " + DESC_EXHAUSTIVE
                 }
         )
         public OptimizerName[] optimizers = {OptimizerName.ADAPTIVE};
@@ -61,7 +59,6 @@ public final class CliOptions {
         BASELINE,
         ENTROPY,
         ADAPTIVE,
-        EXHAUSTIVE,
-        LITERAL
+        EXHAUSTIVE
     }
 }
