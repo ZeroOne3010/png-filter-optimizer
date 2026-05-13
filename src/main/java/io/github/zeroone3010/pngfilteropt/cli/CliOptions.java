@@ -10,6 +10,10 @@ public final class CliOptions {
     public static final String DESC_ADAPTIVE = "Greedy per-row sum-of-absolute-values heuristic (fast, not true global DEFLATE optimization).";
     public static final String DESC_EXHAUSTIVE = "Beam search over row filter sequences scored by LZ-style heuristics; larger --beam explores more paths but is not globally optimal.";
     public static final String DESC_FIXED_NONE = "Forces filter 0 (NONE) for every row as a fixed reference column.";
+    public static final String DESC_FIXED_SUB = "Forces filter 1 (SUB) for every row as a fixed reference column.";
+    public static final String DESC_FIXED_UP = "Forces filter 2 (UP) for every row as a fixed reference column.";
+    public static final String DESC_FIXED_AVERAGE = "Forces filter 3 (AVERAGE) for every row as a fixed reference column.";
+    public static final String DESC_FIXED_PAETH = "Forces filter 4 (PAETH) for every row as a fixed reference column.";
     public static final String DESC_ORIGINAL = "Original input PNG size without re-filtering.";
     public static final String DESC_ZOPFLIPNG_DEFAULT = "Original PNG size used as placeholder for default zopflipng recompression baseline.";
     public static final String DESC_BEST = "Smallest strategy value on each image row.";
@@ -29,7 +33,11 @@ public final class CliOptions {
                         "  entropy   - " + DESC_ENTROPY,
                         "  adaptive  - " + DESC_ADAPTIVE,
                         "  exhaustive- " + DESC_EXHAUSTIVE,
-                        "  fixed-none- " + DESC_FIXED_NONE
+                        "  fixed-none   - " + DESC_FIXED_NONE,
+                        "  fixed-sub    - " + DESC_FIXED_SUB,
+                        "  fixed-up     - " + DESC_FIXED_UP,
+                        "  fixed-average- " + DESC_FIXED_AVERAGE,
+                        "  fixed-paeth  - " + DESC_FIXED_PAETH
                 }
         )
         public OptimizerName[] optimizers = {OptimizerName.ADAPTIVE};
@@ -61,6 +69,10 @@ public final class CliOptions {
         ENTROPY,
         ADAPTIVE,
         EXHAUSTIVE,
-        FIXED_NONE
+        FIXED_NONE,
+        FIXED_SUB,
+        FIXED_UP,
+        FIXED_AVERAGE,
+        FIXED_PAETH
     }
 }

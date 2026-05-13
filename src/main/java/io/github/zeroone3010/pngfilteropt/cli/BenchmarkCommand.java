@@ -56,15 +56,19 @@ public final class BenchmarkCommand implements Runnable {
         var inspector = new FilterInspector();
         var selected = optimizerSelection.tryAll ? List.of(CliOptions.OptimizerName.values()) : Arrays.asList(optimizerSelection.optimizers);
         spec.commandLine().getOut().printf(
-                "benchmark_columns: selected=[%s]; always-on=[original, fixed-none%s]%n",
+                "benchmark_columns: selected=[%s]%s%n",
                 selected.stream().map(name -> name.name().toLowerCase().replace('_', '-')).collect(Collectors.joining(", ")),
-                optimizerSelection.zopflipngPath != null ? ", zopflipng-default" : ""
+                optimizerSelection.zopflipngPath != null ? "; plus=[original, zopflipng-default]" : "; plus=[original]"
         );
         Map<CliOptions.OptimizerName, FilterOptimizer> optimizers = Map.of(
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(),
                 CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
                 CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(optimizerSelection.beamWidth),
-                CliOptions.OptimizerName.FIXED_NONE, new FixedFilterOptimizer(PngFilter.NONE)
+                CliOptions.OptimizerName.FIXED_NONE, new FixedFilterOptimizer(PngFilter.NONE),
+                CliOptions.OptimizerName.FIXED_SUB, new FixedFilterOptimizer(PngFilter.SUB),
+                CliOptions.OptimizerName.FIXED_UP, new FixedFilterOptimizer(PngFilter.UP),
+                CliOptions.OptimizerName.FIXED_AVERAGE, new FixedFilterOptimizer(PngFilter.AVERAGE),
+                CliOptions.OptimizerName.FIXED_PAETH, new FixedFilterOptimizer(PngFilter.PAETH)
         );
 
         for (Path png : pngs) {
@@ -91,7 +95,6 @@ public final class BenchmarkCommand implements Runnable {
                 strategies.put(key, estimateDeflatedSize(optimized));
             }
 
-            strategies.put("fixed-none", estimateDeflatedSize(new FixedFilterOptimizer(PngFilter.NONE).optimize(raw, candidates)));
             if (optimizerSelection.zopflipngPath != null) {
                 strategies.put("zopflipng-default", original);
             }
@@ -179,6 +182,10 @@ public final class BenchmarkCommand implements Runnable {
             case "adaptive" -> CliOptions.DESC_ADAPTIVE;
             case "exhaustive" -> CliOptions.DESC_EXHAUSTIVE;
             case "fixed-none" -> CliOptions.DESC_FIXED_NONE;
+            case "fixed-sub" -> CliOptions.DESC_FIXED_SUB;
+            case "fixed-up" -> CliOptions.DESC_FIXED_UP;
+            case "fixed-average" -> CliOptions.DESC_FIXED_AVERAGE;
+            case "fixed-paeth" -> CliOptions.DESC_FIXED_PAETH;
             case "zopflipng-default" -> CliOptions.DESC_ZOPFLIPNG_DEFAULT;
             case "best" -> CliOptions.DESC_BEST;
             default -> "Strategy column.";
