@@ -7,7 +7,6 @@ import io.github.zeroone3010.pngfilteropt.filter.PngFilter;
 import io.github.zeroone3010.pngfilteropt.optimize.EntropyOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FilterOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FixedFilterOptimizer;
-import io.github.zeroone3010.pngfilteropt.optimize.LiteralOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.LzBeamOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.SumAbsOptimizer;
 import io.github.zeroone3010.pngfilteropt.png.FilteredImage;
@@ -58,14 +57,14 @@ public final class BenchmarkCommand implements Runnable {
         var selected = optimizerSelection.tryAll ? List.of(CliOptions.OptimizerName.values()) : Arrays.asList(optimizerSelection.optimizers);
         spec.commandLine().getOut().printf(
                 "benchmark_columns: selected=[%s]; always-on=[original, fixed-none%s]%n",
-                selected.stream().map(name -> name.name().toLowerCase()).collect(Collectors.joining(", ")),
+                selected.stream().map(name -> name.name().toLowerCase().replace('_', '-')).collect(Collectors.joining(", ")),
                 optimizerSelection.zopflipngPath != null ? ", zopflipng-default" : ""
         );
         Map<CliOptions.OptimizerName, FilterOptimizer> optimizers = Map.of(
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(),
                 CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
                 CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(),
-                CliOptions.OptimizerName.LITERAL, new LiteralOptimizer()
+                CliOptions.OptimizerName.FIXED_NONE, new FixedFilterOptimizer(PngFilter.NONE)
         );
 
         for (Path png : pngs) {
@@ -76,7 +75,7 @@ public final class BenchmarkCommand implements Runnable {
 
             for (CliOptions.OptimizerName name : selected) {
                 FilteredImage optimized;
-                String key = name.name().toLowerCase();
+                String key = name.name().toLowerCase().replace('_', '-');
                 if (name == CliOptions.OptimizerName.BASELINE) {
                     var inputFilters = inspector.listFilters(png, raw);
                     List<FilteredRow> rows = new ArrayList<>(raw.height());
@@ -179,7 +178,6 @@ public final class BenchmarkCommand implements Runnable {
             case "entropy" -> CliOptions.DESC_ENTROPY;
             case "adaptive" -> CliOptions.DESC_ADAPTIVE;
             case "exhaustive" -> CliOptions.DESC_EXHAUSTIVE;
-            case "literal" -> CliOptions.DESC_LITERAL;
             case "fixed-none" -> CliOptions.DESC_FIXED_NONE;
             case "zopflipng-default" -> CliOptions.DESC_ZOPFLIPNG_DEFAULT;
             case "best" -> CliOptions.DESC_BEST;
