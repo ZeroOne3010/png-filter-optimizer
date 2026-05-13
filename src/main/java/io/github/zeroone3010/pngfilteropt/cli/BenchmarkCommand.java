@@ -56,7 +56,11 @@ public final class BenchmarkCommand implements Runnable {
         var candidates = new CandidateGenerator();
         var inspector = new FilterInspector();
         var selected = optimizerSelection.tryAll ? List.of(CliOptions.OptimizerName.values()) : Arrays.asList(optimizerSelection.optimizers);
-        spec.commandLine().getOut().printf("running_strategies=%s\n", describeStrategies(selected, optimizerSelection.zopflipngPath != null));
+        spec.commandLine().getOut().printf(
+                "benchmark_columns: selected=[%s]; always-on=[original, fixed-none%s]%n",
+                selected.stream().map(name -> name.name().toLowerCase()).collect(Collectors.joining(", ")),
+                optimizerSelection.zopflipngPath != null ? ", zopflipng-default" : ""
+        );
         Map<CliOptions.OptimizerName, FilterOptimizer> optimizers = Map.of(
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(),
                 CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
@@ -140,7 +144,7 @@ public final class BenchmarkCommand implements Runnable {
 
     private static String renderMarkdown(List<Map<String, Object>> images) {
         if (images.isEmpty()) {
-            return "| image | original | best |\n|---|---:|---|\n";
+            return "| image | original | best |\n|---|---:|---|\n\n### Legend\n- `original`: " + CliOptions.DESC_ORIGINAL + "\n- `best`: " + CliOptions.DESC_BEST + "\n";
         }
         @SuppressWarnings("unchecked") Map<String, Long> first = (Map<String, Long>) images.get(0).get("strategies");
         List<String> columns = new ArrayList<>(first.keySet());
@@ -156,7 +160,30 @@ public final class BenchmarkCommand implements Runnable {
             for (String column : columns) sb.append(" | ").append(s.get(column));
             sb.append(" | ").append(image.get("best")).append(" |\n");
         }
+        sb.append("\n### Legend\n");
+        List<String> present = new ArrayList<>();
+        present.add("original");
+        present.addAll(columns);
+        present.add("best");
+        for (String key : present) {
+            sb.append("- `").append(key).append("`: ").append(legendText(key)).append("\n");
+        }
         return sb.toString();
+    }
+
+    private static String legendText(String key) {
+        return switch (key) {
+            case "original" -> CliOptions.DESC_ORIGINAL;
+            case "baseline" -> CliOptions.DESC_BASELINE;
+            case "entropy" -> CliOptions.DESC_ENTROPY;
+            case "adaptive" -> CliOptions.DESC_ADAPTIVE;
+            case "exhaustive" -> CliOptions.DESC_EXHAUSTIVE;
+            case "literal" -> CliOptions.DESC_LITERAL;
+            case "fixed-none" -> CliOptions.DESC_FIXED_NONE;
+            case "zopflipng-default" -> CliOptions.DESC_ZOPFLIPNG_DEFAULT;
+            case "best" -> CliOptions.DESC_BEST;
+            default -> "Strategy column.";
+        };
     }
 
     private static String renderJson(List<Map<String, Object>> images, long original, long best, long sumabs, Long zopflipngTotal) {
@@ -170,14 +197,6 @@ public final class BenchmarkCommand implements Runnable {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize benchmark report JSON", e);
         }
-    }
-
-    private static String describeStrategies(List<CliOptions.OptimizerName> selected, boolean includeZopfliDefault) {
-        var names = selected.stream()
-                .map(name -> name.name().toLowerCase())
-                .collect(Collectors.joining(", "));
-        var withFixed = "original, " + names + ", fixed-none";
-        return includeZopfliDefault ? withFixed + ", zopflipng-default" : withFixed;
     }
 
     private static void writeIfRequested(Path output, String content) {

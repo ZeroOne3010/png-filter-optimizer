@@ -91,10 +91,14 @@ class CliBehaviorTest {
                 .setOut(new java.io.PrintWriter(out, true))
                 .execute("benchmark", root.toString(), "--try-all", "--markdown", md.toString(), "--json", jsonPath.toString());
         assertEquals(0, exit);
-        assertTrue(out.toString().contains("running_strategies=original, baseline, entropy, adaptive, exhaustive, literal, fixed-none"));
+        assertTrue(out.toString().contains("benchmark_columns: selected=[baseline, entropy, adaptive, exhaustive, literal]; always-on=[original, fixed-none]"));
         String mdText = Files.readString(md);
         String jsonText = Files.readString(jsonPath);
         assertTrue(mdText.contains("| image | original | baseline | entropy | adaptive | exhaustive | literal | fixed-none | best |"));
+        assertTrue(mdText.contains("### Legend"));
+        assertTrue(mdText.contains("- `baseline`:"));
+        assertTrue(mdText.contains("- `fixed-none`:"));
+        assertTrue(mdText.contains("- `best`:"));
         var json = new ObjectMapper().readTree(jsonText);
         assertTrue(json.has("images"));
         assertTrue(json.get("summary").has("best_vs_original_pct"));
@@ -112,7 +116,9 @@ class CliBehaviorTest {
                 .execute("benchmark", root.toString());
 
         assertEquals(0, exit);
-        assertTrue(out.toString().contains("running_strategies=original, adaptive, fixed-none"));
+        assertTrue(out.toString().contains("benchmark_columns: selected=[adaptive]; always-on=[original, fixed-none]"));
+        assertTrue(out.toString().contains("### Legend"));
+        assertTrue(out.toString().contains("- `adaptive`:"));
     }
 
 
@@ -131,7 +137,7 @@ class CliBehaviorTest {
                 .execute("benchmark", root.toString(), "--zopflipng", script.toString());
 
         assertEquals(0, exit);
-        assertTrue(out.toString().contains("running_strategies=original, adaptive, fixed-none, zopflipng-default"));
+        assertTrue(out.toString().contains("benchmark_columns: selected=[adaptive]; always-on=[original, fixed-none, zopflipng-default]"));
     }
 
 }
