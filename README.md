@@ -22,17 +22,17 @@ Pipeline:
 
 ## Valid CLI optimizer names (`--optimizer`)
 
-- `baseline` — preserves the baseline filtering approach and recompresses output.
-- `entropy` — chooses per-row filters using Shannon entropy heuristics.
-- `adaptive` — uses a dynamic-programming style global optimization strategy.
-- `exhaustive` — searches filter combinations up to the configured `--beam` width.
-- `literal` — always uses filter `0` (`NONE`) for every row (no prediction).
+- `baseline` — preserves current filter strategy and only recompresses.
+- `entropy` — chooses per-row filters by Shannon entropy heuristics.
+- `adaptive` — uses dynamic programming to optimize global compressed size.
+- `exhaustive` — evaluates all filter sequences up to `--beam` width.
+- `literal` — forces filter `0` (`NONE`) for every row.
 
 ## Benchmark behavior
 
 - By default, `benchmark` runs only `adaptive` unless you pass `--optimizer` or `--try-all`.
-- `fixed-none` is always included in benchmark output as a reference column.
-- `--try-all` runs all optimizer names: `baseline`, `entropy`, `adaptive`, `exhaustive`, `literal`.
+- `fixed-none` is always included as a fixed reference column (forces filter `0`/`NONE` for every row).
+- `--try-all` ignores explicit optimizer order and runs all optimizer names: `baseline`, `entropy`, `adaptive`, `exhaustive`, `literal`.
 
 ## Quick examples
 

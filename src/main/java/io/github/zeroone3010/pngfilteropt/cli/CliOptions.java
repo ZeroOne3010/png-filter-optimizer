@@ -5,6 +5,15 @@ import picocli.CommandLine.Option;
 import java.nio.file.Path;
 
 public final class CliOptions {
+    public static final String DESC_BASELINE = "Preserves current filter strategy and only recompresses.";
+    public static final String DESC_ENTROPY = "Chooses per-row filters by Shannon entropy heuristics.";
+    public static final String DESC_ADAPTIVE = "Uses dynamic programming to optimize global compressed size.";
+    public static final String DESC_EXHAUSTIVE = "Evaluates all filter sequences up to --beam width.";
+    public static final String DESC_LITERAL = "Forces filter 0 (NONE) for every row.";
+    public static final String DESC_FIXED_NONE = "Forces filter 0 (NONE) for every row as a fixed reference column.";
+    public static final String DESC_ORIGINAL = "Original input PNG size without re-filtering.";
+    public static final String DESC_ZOPFLIPNG_DEFAULT = "Original PNG size used as placeholder for default zopflipng recompression baseline.";
+    public static final String DESC_BEST = "Smallest strategy value on each image row.";
 
     private CliOptions() {
     }
@@ -17,11 +26,11 @@ public final class CliOptions {
                 description = {
                         "Optimizer(s) to run. Can be provided multiple times or as comma-separated values.",
                         "Available names:",
-                        "  baseline  - Preserves current filter strategy and only recompresses.",
-                        "  entropy   - Chooses per-row filters by Shannon entropy heuristics.",
-                        "  adaptive  - Uses dynamic programming to optimize global compressed size.",
-                        "  exhaustive- Evaluates all filter sequences up to --beam width.",
-                        "  literal   - Forces filter 0 (NONE) for every row."
+                        "  baseline  - " + DESC_BASELINE,
+                        "  entropy   - " + DESC_ENTROPY,
+                        "  adaptive  - " + DESC_ADAPTIVE,
+                        "  exhaustive- " + DESC_EXHAUSTIVE,
+                        "  literal   - " + DESC_LITERAL
                 }
         )
         public OptimizerName[] optimizers = {OptimizerName.ADAPTIVE};
