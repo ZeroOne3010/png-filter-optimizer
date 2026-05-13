@@ -109,6 +109,7 @@ public final class BenchmarkCommand implements Runnable {
         String markdown = renderMarkdown(images);
         String json = renderJson(images, originalTotal, bestTotal, sumabsTotal, zopflipngTotal);
         spec.commandLine().getOut().print(markdown);
+        spec.commandLine().getOut().flush();
         writeIfRequested(markdownOutput, markdown);
         writeIfRequested(jsonOutput, json);
     }
