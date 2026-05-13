@@ -24,15 +24,15 @@ Pipeline:
 
 - `baseline` — preserves current filter strategy and only recompresses.
 - `entropy` — chooses per-row filters by Shannon entropy heuristics.
-- `adaptive` — uses dynamic programming to optimize global compressed size.
-- `exhaustive` — evaluates all filter sequences up to `--beam` width.
-- `literal` — forces filter `0` (`NONE`) for every row.
+- `adaptive` — greedy per-row sum-of-absolute-values heuristic (fast, not true global DEFLATE optimization).
+- `exhaustive` — beam search over row filter sequences with an LZ-style heuristic score; `--beam` controls breadth, not exact global optimization.
+- `fixed-none` — forces filter `0` (`NONE`) for every row.
 
 ## Benchmark behavior
 
 - By default, `benchmark` runs only `adaptive` unless you pass `--optimizer` or `--try-all`.
 - `fixed-none` is always included as a fixed reference column (forces filter `0`/`NONE` for every row).
-- `--try-all` ignores explicit optimizer order and runs all optimizer names: `baseline`, `entropy`, `adaptive`, `exhaustive`, `literal`.
+- `--try-all` ignores explicit optimizer order and runs all optimizer names: `baseline`, `entropy`, `adaptive`, `exhaustive`, `fixed-none`.
 
 ## Quick examples
 
@@ -43,3 +43,9 @@ Pipeline:
 ./gradlew run --args="inspect in.png"
 ./gradlew run --args="benchmark src/test/resources/test-images --markdown build/reports/pngfilteropt/benchmark.md --json build/reports/pngfilteropt/benchmark.json"
 ```
+## Accuracy note
+
+- Current optimizers are heuristic proxies for eventual DEFLATE size.
+- Neither `adaptive` nor `exhaustive` guarantees the mathematically minimal compressed PNG.
+- For exact minimization claims, a true end-to-end global DEFLATE objective would need to be implemented.
+
