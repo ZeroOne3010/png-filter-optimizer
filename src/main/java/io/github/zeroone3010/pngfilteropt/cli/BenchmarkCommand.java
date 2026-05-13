@@ -2,6 +2,7 @@ package io.github.zeroone3010.pngfilteropt.cli;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.zeroone3010.pngfilteropt.diagnostics.DiagnosticsCalculator;
 import io.github.zeroone3010.pngfilteropt.filter.CandidateGenerator;
 import io.github.zeroone3010.pngfilteropt.filter.PngFilter;
 import io.github.zeroone3010.pngfilteropt.optimize.EntropyOptimizer;
@@ -13,6 +14,7 @@ import io.github.zeroone3010.pngfilteropt.png.FilteredImage;
 import io.github.zeroone3010.pngfilteropt.png.FilterInspector;
 import io.github.zeroone3010.pngfilteropt.png.FilteredRow;
 import io.github.zeroone3010.pngfilteropt.png.PngDecoder;
+import io.github.zeroone3010.pngfilteropt.report.MarkdownDiagnosticsRenderer;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -44,6 +46,7 @@ public final class BenchmarkCommand implements Runnable {
     @Mixin CliOptions.OptimizerSelection optimizerSelection;
     @Option(names = "--markdown", paramLabel = "PATH", description = "Optional path to write a Markdown benchmark summary.") Path markdownOutput;
     @Option(names = "--json", paramLabel = "PATH", description = "Optional path to write raw benchmark results as JSON.") Path jsonOutput;
+    @Option(names = "--diagnostics", description = "Include per-strategy filtered-stream diagnostics in report output.") boolean diagnostics;
 
     @Override
     public void run() {
@@ -55,6 +58,7 @@ public final class BenchmarkCommand implements Runnable {
         var candidates = new CandidateGenerator();
         var inspector = new FilterInspector();
         var selected = optimizerSelection.tryAll ? List.of(CliOptions.OptimizerName.values()) : Arrays.asList(optimizerSelection.optimizers);
+        var diagnosticsCalculator = new DiagnosticsCalculator();
         spec.commandLine().getOut().printf(
                 "benchmark_columns: selected=[%s]%s%n",
                 selected.stream().map(name -> name.name().toLowerCase().replace('_', '-')).collect(Collectors.joining(", ")),
@@ -77,6 +81,7 @@ public final class BenchmarkCommand implements Runnable {
             Map<String, Long> strategies = new LinkedHashMap<>();
             strategies.put("original", original);
 
+            Map<String, Object> strategyDiagnostics = new LinkedHashMap<>();
             for (CliOptions.OptimizerName name : selected) {
                 FilteredImage optimized;
                 String key = name.name().toLowerCase().replace('_', '-');
@@ -93,6 +98,7 @@ public final class BenchmarkCommand implements Runnable {
                     optimized = optimizers.get(name).optimize(raw, candidates);
                 }
                 strategies.put(key, estimateDeflatedSize(optimized));
+                if (diagnostics) strategyDiagnostics.put(key, diagnosticsCalculator.calculate(optimized));
             }
 
             if (optimizerSelection.zopflipngPath != null) {
@@ -100,7 +106,12 @@ public final class BenchmarkCommand implements Runnable {
             }
 
             var best = strategies.entrySet().stream().min(Comparator.comparingLong(Map.Entry::getValue)).orElseThrow();
-            images.add(Map.of("image", directory.relativize(png).toString(), "strategies", strategies, "best", best.getKey()));
+            Map<String,Object> imageRow = new LinkedHashMap<>();
+            imageRow.put("image", directory.relativize(png).toString());
+            imageRow.put("strategies", strategies);
+            imageRow.put("best", best.getKey());
+            if (diagnostics) imageRow.put("diagnostics", strategyDiagnostics);
+            images.add(imageRow);
             originalTotal += original;
             bestTotal += best.getValue();
             long adaptiveBaseline = estimateDeflatedSize(new SumAbsOptimizer().optimize(raw, candidates));
@@ -109,6 +120,7 @@ public final class BenchmarkCommand implements Runnable {
         }
 
         String markdown = renderMarkdown(images);
+        if (diagnostics) markdown += new MarkdownDiagnosticsRenderer().render(images);
         String json = renderJson(images, originalTotal, bestTotal, sumabsTotal, zopflipngTotal);
         spec.commandLine().getOut().print(markdown);
         spec.commandLine().getOut().flush();
