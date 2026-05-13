@@ -8,7 +8,7 @@ public final class CliOptions {
     public static final String DESC_BASELINE = "Preserves current filter strategy and only recompresses.";
     public static final String DESC_ENTROPY = "Chooses per-row filters by Shannon entropy heuristics.";
     public static final String DESC_ADAPTIVE = "Uses dynamic programming to optimize global compressed size.";
-    public static final String DESC_EXHAUSTIVE = "Evaluates all filter sequences up to --beam width.";
+    public static final String DESC_EXHAUSTIVE = "Uses beam search over row-filter candidates with width controlled by --beam.";
     public static final String DESC_LITERAL = "Forces filter 0 (NONE) for every row.";
     public static final String DESC_FIXED_NONE = "Forces filter 0 (NONE) for every row as a fixed reference column.";
     public static final String DESC_ORIGINAL = "Original input PNG size without re-filtering.";
