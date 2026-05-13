@@ -6,7 +6,11 @@ on:
       corpus_path:
         description: "Path to PNG corpus directory in repository/workspace"
         required: true
-        default: "corpus"
+        default: "src/test/resources/test-images/"
+      diagnostics_mode:
+        description: "Include diagnostic output in benchmark reports (true/false)"
+        required: false
+        default: "true"
       sticky_pr_comment:
         description: "Post sticky PR comment (true/false)"
         required: false
@@ -53,7 +57,11 @@ jobs:
       - name: Run PNG corpus benchmark
         run: |
           mkdir -p build/reports/pngfilteropt
-          ./gradlew --no-daemon run --args="benchmark ${{ github.event.inputs.corpus_path }} --try-all --markdown build/reports/pngfilteropt/benchmark.md --json build/reports/pngfilteropt/benchmark.json"
+          DIAG_FLAG=""
+          if [ "${{ github.event.inputs.diagnostics_mode }}" = "true" ]; then
+            DIAG_FLAG="--diagnostics"
+          fi
+          ./gradlew --no-daemon run --args="benchmark ${{ github.event.inputs.corpus_path }} --try-all ${DIAG_FLAG} --markdown build/reports/pngfilteropt/benchmark.md --json build/reports/pngfilteropt/benchmark.json"
 
       - name: Append benchmark summary
         run: cat build/reports/pngfilteropt/benchmark.md >> "$GITHUB_STEP_SUMMARY"
