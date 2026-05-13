@@ -144,4 +144,24 @@ class CliBehaviorTest {
         assertTrue(out.toString().contains("benchmark_columns: selected=[adaptive]; plus=[original, zopflipng-default]"));
     }
 
+    @Test
+    void benchmarkDiagnosticsAddsSectionToMarkdownAndJson() throws Exception {
+        Path root = Files.createTempDirectory("png-bench-diag");
+        TestPngFixtures.createPng(root.resolve("one.png"), 2, 2);
+        Path md = Files.createTempFile("bench-diag", ".md");
+        Path jsonPath = Files.createTempFile("bench-diag", ".json");
+
+        int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .execute("benchmark", root.toString(), "--try-all", "--diagnostics", "--diagnostics-lz-sample-step", "2", "--diagnostics-lz-max-candidates", "8", "--markdown", md.toString(), "--json", jsonPath.toString());
+
+        assertEquals(0, exit);
+        String mdText = Files.readString(md);
+        String jsonText = Files.readString(jsonPath);
+        assertTrue(mdText.contains("## Diagnostics"));
+        assertTrue(mdText.contains("Filter distribution"));
+        assertTrue(mdText.contains("approximate LZ longest-match estimation"));
+        var json = new ObjectMapper().readTree(jsonText);
+        assertTrue(json.get("images").get(0).has("diagnostics"));
+    }
+
 }
