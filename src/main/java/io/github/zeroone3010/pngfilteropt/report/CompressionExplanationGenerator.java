@@ -67,6 +67,9 @@ public final class CompressionExplanationGenerator {
         if (localConflict && "PAETH".equals(localBest)) {
             return best + " outperforms PAETH overall because global repetition outweighs local residual minimization for final DEFLATE size.";
         }
+        if ("fixed-paeth".equals(best) || "paeth".equals(best)) {
+            return "PAETH wins because predictor precision and global repetition are aligned in this stream.";
+        }
         if (winnerLongest > 0 && winnerLongest == maxLongest) {
             return best + " also reaches the strongest long-range residual match depth, further improving compression-friendly repetition.";
         }
@@ -75,9 +78,6 @@ public final class CompressionExplanationGenerator {
         }
         if ("fixed-up".equals(best)) {
             return "fixed-up benefits from vertically coherent residual structure that translates into stable DEFLATE back-references.";
-        }
-        if ("fixed-paeth".equals(best) || "paeth".equals(best)) {
-            return "PAETH wins because predictor precision and global repetition are aligned in this stream.";
         }
         return DEFAULT_MESSAGE;
     }
