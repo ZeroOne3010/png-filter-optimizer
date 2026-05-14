@@ -86,7 +86,11 @@ public final class CompressionExplanationGenerator {
             if (winner.rowsEqualToPrevious() == maxRows && maxRows > 0 && context.best().equals("fixed-none")) {
                 out.add(new ExplanationObservation(85, "NONE preserves literal row repetition, which can improve downstream DEFLATE matching despite weaker local residual metrics."));
             }
-            if (winner.repetitionMetrics().longest32KiBMatch() >= context.diagnostics().values().stream().mapToInt(x -> x.repetitionMetrics().longest32KiBMatch()).max().orElse(0)) {
+            int maxLongestMatch = context.diagnostics().values().stream()
+                    .mapToInt(x -> x.repetitionMetrics().longest32KiBMatch())
+                    .max()
+                    .orElse(0);
+            if (maxLongestMatch > 0 && winner.repetitionMetrics().longest32KiBMatch() >= maxLongestMatch) {
                 out.add(new ExplanationObservation(75, "Longest repeated match diagnostics indicate strong global back-reference opportunities in the winning stream."));
             }
             return out;

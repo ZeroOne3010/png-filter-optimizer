@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class CompressionExplanationGeneratorTest {
     private final CompressionExplanationGenerator generator = new CompressionExplanationGenerator();
@@ -61,6 +62,7 @@ class CompressionExplanationGeneratorTest {
         d.put("fixed-none", diag(0, 0, 0, 20, 1.0));
         String text = generator.explain("adaptive", d);
         assertTrue(text.contains("tradeoff"));
+        assertFalse(text.contains("strong global back-reference opportunities"));
     }
 
     private static FilteredStreamDiagnostics diag(int repeated32, int longestMatch, int rowsEqualPrev, long paethResidual, double ratio) {
