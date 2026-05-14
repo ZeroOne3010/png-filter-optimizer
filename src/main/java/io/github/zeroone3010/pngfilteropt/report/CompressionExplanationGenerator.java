@@ -50,7 +50,10 @@ public final class CompressionExplanationGenerator {
         }
 
         if (winnerRep32 > 0 || runnerRep32 > 0) {
-            return "However, " + best + " produces " + intensity + " repeated DEFLATE-friendly 32-byte substrings (" + winnerRep32 + " vs " + runnerRep32 + "), creating stronger LZ-style match opportunities.";
+            String lzImpact = winnerRep32 >= runnerRep32
+                    ? "creating stronger LZ-style match opportunities."
+                    : "reducing LZ-style match opportunities relative to alternatives.";
+            return "However, " + best + " produces " + intensity + " repeated DEFLATE-friendly 32-byte substrings (" + winnerRep32 + " vs " + runnerRep32 + "), " + lzImpact;
         }
 
         return "However, " + best + " wins on global stream structure rather than a single dominant local metric.";
@@ -86,6 +89,7 @@ public final class CompressionExplanationGenerator {
         if (ratio > 0.50) return "dramatically more";
         if (ratio > 0.20) return "substantially more";
         if (ratio < -0.20) return "significantly fewer";
+        if (ratio < 0.0) return "slightly fewer";
         return "slightly more";
     }
 

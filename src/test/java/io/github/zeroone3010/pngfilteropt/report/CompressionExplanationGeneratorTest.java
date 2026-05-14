@@ -69,6 +69,26 @@ class CompressionExplanationGeneratorTest {
         assertTrue(text.contains("dramatically more"));
     }
 
+
+    @Test
+    void explainsLowerRepetitionWithoutContradictoryLzClaim() {
+        Map<String, FilteredStreamDiagnostics> d = new LinkedHashMap<>();
+        d.put("fixed-up", diag(95, 260, 60, 320, 0.90));
+        d.put("fixed-paeth", diag(100, 250, 50, 250, 0.90));
+        String text = generator.explain("fixed-up", d);
+        assertTrue(text.contains("slightly fewer"));
+        assertTrue(text.contains("reducing LZ-style match opportunities"));
+    }
+
+    @Test
+    void explainsSignificantlyFewerWhenLargeNegativeDelta() {
+        Map<String, FilteredStreamDiagnostics> d = new LinkedHashMap<>();
+        d.put("fixed-up", diag(70, 260, 60, 320, 0.90));
+        d.put("fixed-paeth", diag(100, 250, 50, 250, 0.90));
+        String text = generator.explain("fixed-up", d);
+        assertTrue(text.contains("significantly fewer"));
+    }
+
     private static FilteredStreamDiagnostics diag(int repeated32, int longestMatch, int rowsEqualPrev, long paethResidual, double ratio) {
         return new FilteredStreamDiagnostics(16, 16, 6, 8, 4, 64, 1000, 7.0, 30, 3.0, 190, 5, 0, rowsEqualPrev, 0, usage(),
                 new RepetitionMetrics(0, repeated32, 0, longestMatch, 0),
