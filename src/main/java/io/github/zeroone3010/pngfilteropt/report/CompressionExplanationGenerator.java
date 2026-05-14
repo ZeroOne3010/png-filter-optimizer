@@ -52,7 +52,7 @@ public final class CompressionExplanationGenerator {
         if (winnerRep32 > 0 || runnerRep32 > 0) {
             long winnerCost = winner.lzParseDiagnostics().approximateLzCostBits();
             long bestAltCost = diagnostics.entrySet().stream().filter(e -> !e.getKey().equals(best)).mapToLong(e -> e.getValue().lzParseDiagnostics().approximateLzCostBits()).min().orElse(winnerCost);
-            if (winnerRep32 < runnerRep32 && winnerCost <= bestAltCost) {
+            if (winnerRep32 < runnerRep32 && winnerCost < bestAltCost) {
                 return "Although alternatives have more repeated 32-byte substrings (" + winnerRep32 + " vs " + runnerRep32 + "), " + best + " has lower estimated LZ token cost and better practical match utility.";
             }
             String lzImpact = winnerRep32 >= runnerRep32

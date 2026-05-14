@@ -17,10 +17,16 @@ import java.util.Set;
 public final class DiagnosticsCalculator {
     private final DirectionalityAnalyzer directionalityAnalyzer = new DirectionalityAnalyzer();
     private final int lzMaxCandidates;
+    private final boolean includeLzDiagnostics;
 
-    public DiagnosticsCalculator() { this(16); }
+    public DiagnosticsCalculator() { this(true, 16); }
 
-    public DiagnosticsCalculator(int lzMaxCandidates) { this.lzMaxCandidates = Math.max(1, lzMaxCandidates); }
+    public DiagnosticsCalculator(int lzMaxCandidates) { this(true, lzMaxCandidates); }
+
+    public DiagnosticsCalculator(boolean includeLzDiagnostics, int lzMaxCandidates) {
+        this.includeLzDiagnostics = includeLzDiagnostics;
+        this.lzMaxCandidates = Math.max(1, lzMaxCandidates);
+    }
 
     public FilteredStreamDiagnostics calculate(FilteredImage image) {
         byte[] stream = toDeflateInputStream(image);
@@ -57,7 +63,9 @@ public final class DiagnosticsCalculator {
         int repeatedFullRowCount = rowHashCounts.values().stream().filter(v -> v > 1).mapToInt(v -> v - 1).sum();
 
         FilterUsage filterUsage = FilterUsage.fromRows(image.rows().stream().map(FilteredRow::filter).toList());
-        var lz = new LzGreedyDiagnostics(lzMaxCandidates).analyze(stream);
+        var lz = includeLzDiagnostics
+                ? new LzGreedyDiagnostics(lzMaxCandidates).analyze(stream)
+                : new LzParseDiagnostics(0, 0, 0, stream.length, 0, 0, 0, new long[6], new long[5], 0, 0, 0, 0);
         RepetitionMetrics rep = repetitionMetrics(stream, lz.maxMatchLength());
         var src = image.source();
         var directional = directionalityAnalyzer.directionalSmoothness(src);

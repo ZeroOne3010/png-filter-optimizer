@@ -70,9 +70,19 @@ final class LzGreedyDiagnostics {
     private static int distBucket(int d){ if(d<=255)return 0; if(d<=1023)return 1; if(d<=4095)return 2; if(d<=16383)return 3; return 4; }
     private static double entropy(int[] hist, long total){ if(total<=0)return 0; double e=0; for(int c:hist){ if(c==0)continue; double p=(double)c/total; e-=p*(Math.log(p)/Math.log(2)); } return e; }
 
-    private static int lengthCode(int len){int[] base={3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258};for(int i=0;i<base.length;i++){int b=base[i];int n=(i<8||i==28)?1:(1<<(Math.max(0,(i-8)/4)));if(len>=b&&len< b+n)return i;}return 28;}
+    private static final int[] LENGTH_BASE={3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258};
+    private static final int[] LENGTH_EXTRA={0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0};
+
+    private static int lengthCode(int len){
+        for(int i=0;i<LENGTH_BASE.length;i++){
+            int start=LENGTH_BASE[i];
+            int span=(i==28)?1:(1<<LENGTH_EXTRA[i]);
+            if(len>=start && len<start+span) return i;
+        }
+        return 28;
+    }
     private static int distanceCode(int dist){int code=0,b=1;while(code<29){int span= code<2?1:(1<<((code/2)-1));if(dist>=b&&dist<b+span)return code;b+=span;code++;}return 29;}
-    private static int lengthExtraBits(int len){int c=lengthCode(len); if(c<=7||c==28)return 0; return (c-4)/4;}
+    private static int lengthExtraBits(int len){return LENGTH_EXTRA[lengthCode(len)];}
     private static int distanceExtraBits(int dist){int c=distanceCode(dist); return c<=3?0:(c/2)-1;}
 
     private record Match(int length, int distance){}

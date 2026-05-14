@@ -18,7 +18,7 @@ class DiagnosticsCalculatorTest {
     @Test void alternatingPatternShowsDirectionalSubstringRepeats(){byte[] b=new byte[256];for(int i=0;i<b.length;i++)b[i]=(byte)((i%2==0)?7:9);var d=calc.calculate(img(List.of(row(0,PngFilter.NONE,b))));assertTrue(d.repetitionMetrics().repeated16ByteSubstrings()>0);assertTrue(d.repetitionMetrics().repeated32ByteSubstrings()>0);} 
     @Test void lzDiagnosticsDifferentiateStreams(){
         byte[] zeros=new byte[5000];
-        byte[] random=new byte[5000]; for(int i=0;i<random.length;i++) random[i]=(byte)(i*37+11);
+        byte[] random=new byte[5000]; new java.util.Random(1234).nextBytes(random);
         byte[] phrase=new byte[6000]; byte[] ptn="ABCDEF".getBytes(); for(int i=0;i<phrase.length;i++) phrase[i]=ptn[i%ptn.length];
         var dz=calc.calculate(img(List.of(row(0,PngFilter.NONE,zeros)))).lzParseDiagnostics();
         var dr=calc.calculate(img(List.of(row(0,PngFilter.NONE,random)))).lzParseDiagnostics();
