@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 public final class MarkdownDiagnosticsRenderer {
+    private final CompressionExplanationGenerator explanationGenerator = new CompressionExplanationGenerator();
     public String render(List<Map<String, Object>> images) {
         StringBuilder sb = new StringBuilder("\n## Diagnostics\n\n");
         sb.append("_Note: diagnostics include approximate LZ longest-match estimation (sampled hash-chain over 32 KiB lookback)._\n\n");
@@ -41,22 +42,9 @@ public final class MarkdownDiagnosticsRenderer {
             sb.append("| AVERAGE | ").append(any.residualDiagnostics().averageSumAbs()).append(" |\n");
             sb.append("| PAETH | ").append(any.residualDiagnostics().paethSumAbs()).append(" |\n");
 
-            sb.append("\nLikely explanation: ").append(explain((String) image.get("best"), d)).append("\n\n");
+            sb.append("\nLikely explanation: ").append(explanationGenerator.explain((String) image.get("best"), d)).append("\n\n");
         }
         return sb.toString();
     }
 
-    private String explain(String best, Map<String, FilteredStreamDiagnostics> d) {
-        var b = d.get(best);
-        if (b == null) return "Best strategy balances entropy and repetition heuristics.";
-        double ratio = b.directionalSmoothness().verticalHorizontalRatio();
-        var r = b.residualDiagnostics();
-        if (best.equals("fixed-none") && b.repetitionMetrics().repeated32ByteSubstrings() > 0) return "NONE preserves repeated row structures despite higher entropy, improving downstream DEFLATE matches.";
-        if (ratio < 0.8) return "Vertical smoothness is stronger than horizontal smoothness, which likely favors UP-style prediction.";
-        if (ratio > 1.25) return "Horizontal coherence dominates vertical coherence, making SUB-style prediction effective.";
-        long minResidual = Math.min(Math.min(Math.min(r.noneSumAbs(), r.subSumAbs()), Math.min(r.upSumAbs(), r.averageSumAbs())), r.paethSumAbs());
-        if (minResidual == r.paethSumAbs()) return "Residual diagnostics favor PAETH, suggesting mixed local smoothness where Paeth's predictor is robust.";
-        if (best.equals("entropy")) return "entropy likely wins because it lowers byte entropy without giving up too much repetition structure.";
-        return best + " likely wins from a favorable tradeoff between entropy, directional smoothness, and residual signals.";
-    }
 }
