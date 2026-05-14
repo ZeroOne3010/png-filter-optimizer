@@ -26,7 +26,7 @@ public final class CompressionExplanationGenerator {
         }
         observations.sort(Comparator.comparingInt(ExplanationObservation::priority).reversed());
         if (observations.isEmpty()) return "Best strategy balances local and global compression heuristics.";
-        return observations.stream().map(ExplanationObservation::message).distinct().limit(4).reduce((a, b) -> a + " " + b).orElse("Best strategy balances local and global compression heuristics.");
+        return observations.stream().map(ExplanationObservation::message).distinct().reduce((a, b) -> a + " " + b).orElse("Best strategy balances local and global compression heuristics.");
     }
 
     interface ExplanationRule {
