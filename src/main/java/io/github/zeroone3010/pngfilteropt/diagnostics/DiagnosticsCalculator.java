@@ -20,6 +20,7 @@ public final class DiagnosticsCalculator {
     private static final int HASH_BYTES = 4;
 
     private final int lzSampleStep;
+    private final DirectionalityAnalyzer directionalityAnalyzer = new DirectionalityAnalyzer();
     private final int lzMaxCandidates;
 
     public DiagnosticsCalculator() {
@@ -68,11 +69,13 @@ public final class DiagnosticsCalculator {
         FilterUsage filterUsage = FilterUsage.fromRows(image.rows().stream().map(FilteredRow::filter).toList());
         RepetitionMetrics rep = repetitionMetrics(stream);
         var src = image.source();
+        var directional = directionalityAnalyzer.directionalSmoothness(src);
+        var residual = directionalityAnalyzer.residualDiagnostics(src);
         return new FilteredStreamDiagnostics(
                 src.width(), src.height(), src.colorType(), src.bitDepth(), src.bytesPerPixel(), src.bytesPerRow(),
                 stream.length, entropy, zeros, stream.length == 0 ? 0d : (100.0 * zeros / stream.length),
                 distinct, longestRun, repeatedFullRowCount, rowsEqualToPrevious, mostCommonRowHash,
-                filterUsage, rep
+                filterUsage, rep, directional, residual
         );
     }
 

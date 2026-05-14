@@ -23,7 +23,24 @@ public final class MarkdownDiagnosticsRenderer {
                 sb.append("| ").append(e.getKey()).append(" | ").append(String.format("%.3f", m.entropy())).append(" | ").append(String.format("%.1f", m.zeroPercentage())).append(" | ").append(m.distinctByteValues()).append(" | ").append(m.longestIdenticalRun()).append(" | ").append(m.rowsEqualToPrevious()).append(" | ").append(m.repetitionMetrics().repeated32ByteSubstrings()).append(" | ").append(m.repetitionMetrics().longest32KiBMatch()).append(" |\n");
             }
             sb.append("\nFilter distribution:\n\n| Strategy | NONE | SUB | UP | AVERAGE | PAETH |\n|---|---:|---:|---:|---:|---:|\n");
-            for (var e : d.entrySet()) { sb.append("| ").append(e.getKey()); for (PngFilter f : PngFilter.values()) sb.append(" | ").append(e.getValue().filterUsage().counts().get(f)); sb.append(" |\n"); }
+            for (var e : d.entrySet()) {
+                sb.append("| ").append(e.getKey());
+                for (PngFilter f : PngFilter.values()) sb.append(" | ").append(e.getValue().filterUsage().counts().get(f));
+                sb.append(" |\n");
+            }
+
+            sb.append("\n## Directional smoothness\n\n| Metric | Value |\n|---|---:|\n");
+            sb.append("| Mean horizontal delta | ").append(String.format("%.2f", any.directionalSmoothness().meanHorizontalDelta())).append(" |\n");
+            sb.append("| Mean vertical delta | ").append(String.format("%.2f", any.directionalSmoothness().meanVerticalDelta())).append(" |\n");
+            sb.append("| Vertical/Horizontal ratio | ").append(String.format("%.2f", any.directionalSmoothness().verticalHorizontalRatio())).append(" |\n");
+
+            sb.append("\n## Residual sumAbs\n\n| Filter | SumAbs |\n|---|---:|\n");
+            sb.append("| NONE | ").append(any.residualDiagnostics().noneSumAbs()).append(" |\n");
+            sb.append("| SUB | ").append(any.residualDiagnostics().subSumAbs()).append(" |\n");
+            sb.append("| UP | ").append(any.residualDiagnostics().upSumAbs()).append(" |\n");
+            sb.append("| AVERAGE | ").append(any.residualDiagnostics().averageSumAbs()).append(" |\n");
+            sb.append("| PAETH | ").append(any.residualDiagnostics().paethSumAbs()).append(" |\n");
+
             sb.append("\nLikely explanation: ").append(explain((String) image.get("best"), d)).append("\n\n");
         }
         return sb.toString();
@@ -32,9 +49,14 @@ public final class MarkdownDiagnosticsRenderer {
     private String explain(String best, Map<String, FilteredStreamDiagnostics> d) {
         var b = d.get(best);
         if (b == null) return "Best strategy balances entropy and repetition heuristics.";
-        if (best.equals("fixed-none") && b.repetitionMetrics().repeated32ByteSubstrings() > 0) return "fixed-none likely wins because it preserves more repeated row/subrow structure despite having higher entropy.";
-        if (best.equals("entropy")) return "entropy likely wins because it lowers byte entropy without significantly reducing repeated substrings.";
-        if (best.equals("fixed-up") || b.rowsEqualToPrevious() > 0) return "fixed-up likely wins because many rows are similar to the previous row.";
-        return best + " likely wins from a favorable tradeoff between entropy and repeated-substring signals.";
+        double ratio = b.directionalSmoothness().verticalHorizontalRatio();
+        var r = b.residualDiagnostics();
+        if (best.equals("fixed-none") && b.repetitionMetrics().repeated32ByteSubstrings() > 0) return "NONE preserves repeated row structures despite higher entropy, improving downstream DEFLATE matches.";
+        if (ratio < 0.8) return "Vertical smoothness is stronger than horizontal smoothness, which likely favors UP-style prediction.";
+        if (ratio > 1.25) return "Horizontal coherence dominates vertical coherence, making SUB-style prediction effective.";
+        long minResidual = Math.min(Math.min(Math.min(r.noneSumAbs(), r.subSumAbs()), Math.min(r.upSumAbs(), r.averageSumAbs())), r.paethSumAbs());
+        if (minResidual == r.paethSumAbs()) return "Residual diagnostics favor PAETH, suggesting mixed local smoothness where Paeth's predictor is robust.";
+        if (best.equals("entropy")) return "entropy likely wins because it lowers byte entropy without giving up too much repetition structure.";
+        return best + " likely wins from a favorable tradeoff between entropy, directional smoothness, and residual signals.";
     }
 }
