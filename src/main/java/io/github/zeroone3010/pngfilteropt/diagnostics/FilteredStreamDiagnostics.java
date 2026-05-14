@@ -18,6 +18,7 @@ public record FilteredStreamDiagnostics(
         int mostCommonRowHashCount,
         FilterUsage filterUsage,
         RepetitionMetrics repetitionMetrics,
+        LzParseDiagnostics lzParseDiagnostics,
         DirectionalSmoothness directionalSmoothness,
         ResidualDiagnostics residualDiagnostics
 ) {

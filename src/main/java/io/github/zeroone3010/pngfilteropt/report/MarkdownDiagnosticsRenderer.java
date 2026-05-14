@@ -18,10 +18,15 @@ public final class MarkdownDiagnosticsRenderer {
             if (d == null || d.isEmpty()) continue;
             var any = d.values().iterator().next();
             sb.append("PNG metadata: width=").append(any.width()).append(", height=").append(any.height()).append(", colorType=").append(any.colorType()).append(", bitDepth=").append(any.bitDepth()).append(", bytesPerPixel=").append(any.bytesPerPixel()).append(", bytesPerRow=").append(any.bytesPerRow()).append("\n\n");
-            sb.append("| Strategy | Entropy | Zero % | Distinct bytes | Longest run | Prev-row repeats | Repeated 32B substrings | Longest 32KiB match |\n|---|---:|---:|---:|---:|---:|---:|---:|\n");
+            sb.append("| Strategy | LZ cost bits | Match coverage % | Avg match len | Matches 64+ | Short dist % | Long dist % |\n|---|---:|---:|---:|---:|---:|---:|\n");
             for (var e : d.entrySet()) {
                 var m = e.getValue();
-                sb.append("| ").append(e.getKey()).append(" | ").append(String.format("%.3f", m.entropy())).append(" | ").append(String.format("%.1f", m.zeroPercentage())).append(" | ").append(m.distinctByteValues()).append(" | ").append(m.longestIdenticalRun()).append(" | ").append(m.rowsEqualToPrevious()).append(" | ").append(m.repetitionMetrics().repeated32ByteSubstrings()).append(" | ").append(m.repetitionMetrics().longest32KiBMatch()).append(" |\n");
+                var lz = m.lzParseDiagnostics();
+                long matches64 = lz.matchLengthBuckets()[4] + lz.matchLengthBuckets()[5];
+                long distTotal = java.util.Arrays.stream(lz.matchDistanceBuckets()).sum();
+                double shortPct = distTotal == 0 ? 0 : (100.0 * lz.matchDistanceBuckets()[0] / distTotal);
+                double longPct = distTotal == 0 ? 0 : (100.0 * lz.matchDistanceBuckets()[4] / distTotal);
+                sb.append("| ").append(e.getKey()).append(" | ").append(lz.approximateLzCostBits()).append(" | ").append(String.format("%.1f", lz.matchCoveragePercent())).append(" | ").append(String.format("%.1f", lz.averageMatchLength())).append(" | ").append(matches64).append(" | ").append(String.format("%.1f", shortPct)).append(" | ").append(String.format("%.1f", longPct)).append(" |\n");
             }
             sb.append("\nFilter distribution:\n\n| Strategy | NONE | SUB | UP | AVERAGE | PAETH |\n|---|---:|---:|---:|---:|---:|\n");
             for (var e : d.entrySet()) {

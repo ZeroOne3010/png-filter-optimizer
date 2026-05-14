@@ -92,6 +92,7 @@ class CompressionExplanationGeneratorTest {
     private static FilteredStreamDiagnostics diag(int repeated32, int longestMatch, int rowsEqualPrev, long paethResidual, double ratio) {
         return new FilteredStreamDiagnostics(16, 16, 6, 8, 4, 64, 1000, 7.0, 30, 3.0, 190, 5, 0, rowsEqualPrev, 0, usage(),
                 new RepetitionMetrics(0, repeated32, 0, longestMatch, 0),
+                new io.github.zeroone3010.pngfilteropt.diagnostics.LzParseDiagnostics(0, 0, 0, 0, 0, 0, longestMatch, new long[6], new long[5], 1000, 0, 0, 0),
                 new DirectionalSmoothness(10.0, 10.0 * ratio, ratio),
                 new ResidualDiagnostics(450, 420, 410, 430, paethResidual));
     }

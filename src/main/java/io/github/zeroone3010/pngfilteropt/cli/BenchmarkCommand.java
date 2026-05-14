@@ -47,7 +47,7 @@ public final class BenchmarkCommand implements Runnable {
     @Option(names = "--markdown", paramLabel = "PATH", description = "Optional path to write a Markdown benchmark summary.") Path markdownOutput;
     @Option(names = "--json", paramLabel = "PATH", description = "Optional path to write raw benchmark results as JSON.") Path jsonOutput;
     @Option(names = "--diagnostics", description = "Include per-strategy filtered-stream diagnostics in report output.") boolean diagnostics;
-    @Option(names = "--diagnostics-lz-sample-step", defaultValue = "4", description = "Sample step for approximate 32KiB longest-match diagnostics (default: ${DEFAULT-VALUE}).") int diagnosticsLzSampleStep;
+    @Option(names = "--diagnostics-lz", description = "Enable bounded greedy LZ parse diagnostics in diagnostics output.") boolean diagnosticsLz = true;
     @Option(names = "--diagnostics-lz-max-candidates", defaultValue = "16", description = "Max hash-chain candidates checked per sampled position in approximate longest-match diagnostics (default: ${DEFAULT-VALUE}).") int diagnosticsLzMaxCandidates;
 
     @Override
@@ -60,7 +60,7 @@ public final class BenchmarkCommand implements Runnable {
         var candidates = new CandidateGenerator();
         var inspector = new FilterInspector();
         var selected = optimizerSelection.tryAll ? List.of(CliOptions.OptimizerName.values()) : Arrays.asList(optimizerSelection.optimizers);
-        var diagnosticsCalculator = new DiagnosticsCalculator(diagnosticsLzSampleStep, diagnosticsLzMaxCandidates);
+        var diagnosticsCalculator = new DiagnosticsCalculator(diagnosticsLzMaxCandidates);
         spec.commandLine().getOut().printf(
                 "benchmark_columns: selected=[%s]%s%n",
                 selected.stream().map(name -> name.name().toLowerCase().replace('_', '-')).collect(Collectors.joining(", ")),
