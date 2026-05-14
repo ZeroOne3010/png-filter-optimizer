@@ -66,9 +66,14 @@ public final class CompressionExplanationGenerator {
         boolean betterLength = winnerLz.averageMatchLength() > runnerLz.averageMatchLength();
         boolean betterDistance = shortDistanceShare(winnerLz) > shortDistanceShare(runnerLz);
 
-        if (Math.abs(repDelta) < SMALL_REPETITION_DELTA && (betterCost || betterLength || betterDistance)) {
+        if (Math.abs(repDelta) < SMALL_REPETITION_DELTA && betterCost && betterLength && betterDistance) {
             return String.format(Locale.ROOT,
                     "Repetition metrics are broadly similar (%d vs %d repeated 32-byte substrings), but %s has lower estimated LZ token cost, longer average matches, and more short-distance matches, indicating a simpler and more stationary residual stream.",
+                    winnerRep32, runnerRep32, best);
+        }
+        if (Math.abs(repDelta) < SMALL_REPETITION_DELTA && (betterCost || betterLength || betterDistance)) {
+            return String.format(Locale.ROOT,
+                    "Repetition metrics are broadly similar (%d vs %d repeated 32-byte substrings), and match quality differs more than raw repetition count; %s shows the stronger local match structure overall.",
                     winnerRep32, runnerRep32, best);
         }
 

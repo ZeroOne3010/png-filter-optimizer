@@ -49,6 +49,17 @@ class CompressionExplanationGeneratorTest {
         assertTrue(text.contains("simpler and more stationary residual stream"));
     }
 
+
+    @Test
+    void avoidsOverclaimingAllMatchSignalsWhenOnlyOneImproves() {
+        Map<String, FilteredStreamDiagnostics> d = new LinkedHashMap<>();
+        d.put("fixed-sub", diag(101, 7.0, 0.45, 640, 230, 20, 320, 1.35));
+        d.put("fixed-paeth", diag(100, 8.0, 0.50, 760, 220, 20, 260, 1.35));
+        String text = generator.explain("fixed-sub", d);
+        assertTrue(text.contains("match quality differs more than raw repetition count"));
+        assertTrue(!text.contains("lower estimated LZ token cost, longer average matches, and more short-distance matches"));
+    }
+
     @Test
     void explainsHorizontalDirectionalCoherence() {
         Map<String, FilteredStreamDiagnostics> d = new LinkedHashMap<>();
