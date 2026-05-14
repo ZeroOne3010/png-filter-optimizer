@@ -13,56 +13,60 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class CompressionExplanationGeneratorTest {
     private final CompressionExplanationGenerator generator = new CompressionExplanationGenerator();
 
     @Test
-    void explainsFixedNoneLiteralRowPreservation() {
+    void explainsFixedNoneScreenshotWins() {
         Map<String, FilteredStreamDiagnostics> d = new LinkedHashMap<>();
-        d.put("fixed-none", diag(5, 100, 80, 300, 1.1));
-        d.put("fixed-paeth", diag(2, 40, 60, 200, 1.0));
+        d.put("fixed-none", diag(120, 180, 140, 320, 1.05));
+        d.put("fixed-paeth", diag(70, 160, 55, 210, 1.00));
         String text = generator.explain("fixed-none", d);
-        assertTrue(text.contains("literal row repetition"));
+        assertTrue(text.contains("fixed-none preserves literal row structure"));
+        assertTrue(text.contains("fixed-none"));
     }
 
     @Test
-    void explainsUpWinsFromVerticalAndRepeatedStructures() {
+    void explainsFixedUpPainterlyWins() {
         Map<String, FilteredStreamDiagnostics> d = new LinkedHashMap<>();
-        d.put("fixed-up", diag(40, 110, 100, 350, 0.7));
-        d.put("fixed-paeth", diag(12, 80, 90, 320, 0.7));
+        d.put("fixed-up", diag(90, 260, 80, 330, 0.70));
+        d.put("fixed-paeth", diag(60, 220, 45, 250, 0.70));
         String text = generator.explain("fixed-up", d);
-        assertTrue(text.contains("Vertical smoothness"));
-        assertTrue(text.contains("DEFLATE-friendly"));
+        assertTrue(text.contains("fixed-up produces"));
+        assertTrue(text.contains("Vertical smoothness is stronger"));
     }
 
     @Test
-    void explainsPaethLocalButNonPaethWinnerConflict() {
+    void explainsFixedSubHorizontalGradients() {
         Map<String, FilteredStreamDiagnostics> d = new LinkedHashMap<>();
-        d.put("fixed-up", diag(45, 140, 120, 400, 0.95));
-        d.put("fixed-paeth", diag(10, 70, 100, 350, 0.95));
-        String text = generator.explain("fixed-up", d);
-        assertTrue(text.contains("Residual diagnostics favor PAETH locally"));
-        assertTrue(text.contains("Global repetition appears to outweigh local residual minimization"));
-    }
-
-    @Test
-    void explainsHorizontalGradientAsSubFriendly() {
-        Map<String, FilteredStreamDiagnostics> d = new LinkedHashMap<>();
-        d.put("fixed-sub", diag(25, 90, 90, 280, 1.35));
+        d.put("fixed-sub", diag(95, 210, 35, 320, 1.35));
+        d.put("fixed-paeth", diag(70, 190, 20, 300, 1.35));
         String text = generator.explain("fixed-sub", d);
-        assertTrue(text.contains("Horizontal coherence"));
+        assertTrue(text.contains("fixed-sub"));
+        assertTrue(text.contains("Horizontal smoothness is stronger"));
     }
 
     @Test
-    void explainsRandomNoiseAsTradeoff() {
+    void explainsPaethTrueWin() {
         Map<String, FilteredStreamDiagnostics> d = new LinkedHashMap<>();
-        d.put("adaptive", diag(0, 0, 0, 500, 1.0));
-        d.put("fixed-none", diag(0, 0, 0, 500, 1.0));
-        String text = generator.explain("adaptive", d);
-        assertTrue(text.contains("tradeoff"));
-        assertFalse(text.contains("strong global back-reference opportunities"));
+        d.put("fixed-paeth", diag(88, 240, 42, 180, 1.0));
+        d.put("fixed-sub", diag(72, 200, 34, 260, 1.3));
+        String text = generator.explain("fixed-paeth", d);
+        assertTrue(text.contains("PAETH minimizes local residual magnitude"));
+        assertTrue(text.contains("PAETH wins because predictor precision"));
+    }
+
+    @Test
+    void explainsStrongLocalGlobalConflict() {
+        Map<String, FilteredStreamDiagnostics> d = new LinkedHashMap<>();
+        d.put("fixed-up", diag(150, 300, 75, 520, 0.95));
+        d.put("fixed-paeth", diag(60, 200, 28, 180, 0.95));
+        String text = generator.explain("fixed-up", d);
+        assertTrue(text.contains("PAETH minimizes local residual magnitude"));
+        assertTrue(text.contains("fixed-up outperforms PAETH overall"));
+        assertTrue(text.contains("150 vs 60"));
+        assertTrue(text.contains("dramatically more"));
     }
 
     private static FilteredStreamDiagnostics diag(int repeated32, int longestMatch, int rowsEqualPrev, long paethResidual, double ratio) {
