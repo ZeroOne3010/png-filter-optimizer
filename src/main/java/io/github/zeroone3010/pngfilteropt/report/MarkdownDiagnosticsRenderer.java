@@ -23,7 +23,24 @@ public final class MarkdownDiagnosticsRenderer {
                 sb.append("| ").append(e.getKey()).append(" | ").append(String.format("%.3f", m.entropy())).append(" | ").append(String.format("%.1f", m.zeroPercentage())).append(" | ").append(m.distinctByteValues()).append(" | ").append(m.longestIdenticalRun()).append(" | ").append(m.rowsEqualToPrevious()).append(" | ").append(m.repetitionMetrics().repeated32ByteSubstrings()).append(" | ").append(m.repetitionMetrics().longest32KiBMatch()).append(" |\n");
             }
             sb.append("\nFilter distribution:\n\n| Strategy | NONE | SUB | UP | AVERAGE | PAETH |\n|---|---:|---:|---:|---:|---:|\n");
-            for (var e : d.entrySet()) { sb.append("| ").append(e.getKey()); for (PngFilter f : PngFilter.values()) sb.append(" | ").append(e.getValue().filterUsage().counts().get(f)); sb.append(" |\n"); }
+            for (var e : d.entrySet()) {
+                sb.append("| ").append(e.getKey());
+                for (PngFilter f : PngFilter.values()) sb.append(" | ").append(e.getValue().filterUsage().counts().get(f));
+                sb.append(" |\n");
+            }
+
+            sb.append("\n## Directional smoothness\n\n| Metric | Value |\n|---|---:|\n");
+            sb.append("| Mean horizontal delta | ").append(String.format("%.2f", any.directionalSmoothness().meanHorizontalDelta())).append(" |\n");
+            sb.append("| Mean vertical delta | ").append(String.format("%.2f", any.directionalSmoothness().meanVerticalDelta())).append(" |\n");
+            sb.append("| Vertical/Horizontal ratio | ").append(String.format("%.2f", any.directionalSmoothness().verticalHorizontalRatio())).append(" |\n");
+
+            sb.append("\n## Residual sumAbs\n\n| Filter | SumAbs |\n|---|---:|\n");
+            sb.append("| NONE | ").append(any.residualDiagnostics().noneSumAbs()).append(" |\n");
+            sb.append("| SUB | ").append(any.residualDiagnostics().subSumAbs()).append(" |\n");
+            sb.append("| UP | ").append(any.residualDiagnostics().upSumAbs()).append(" |\n");
+            sb.append("| AVERAGE | ").append(any.residualDiagnostics().averageSumAbs()).append(" |\n");
+            sb.append("| PAETH | ").append(any.residualDiagnostics().paethSumAbs()).append(" |\n");
+
             sb.append("\nLikely explanation: ").append(explain((String) image.get("best"), d)).append("\n\n");
         }
         return sb.toString();

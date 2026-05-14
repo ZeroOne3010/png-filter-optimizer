@@ -15,13 +15,13 @@ class DirectionalityAnalyzerTest {
     @Test void horizontalGradientIsSubFriendly() {
         RawImage image = rgbGradient(16, 16, true);
         var d = analyzer.directionalSmoothness(image);
-        assertTrue(d.verticalHorizontalRatio() > 1.5);
+        assertTrue(d.verticalHorizontalRatio() < 0.7);
     }
 
     @Test void verticalGradientIsUpFriendly() {
         RawImage image = rgbGradient(16, 16, false);
         var d = analyzer.directionalSmoothness(image);
-        assertTrue(d.verticalHorizontalRatio() < 0.7);
+        assertTrue(d.verticalHorizontalRatio() > 1.5);
     }
 
     @Test void flatColorHasNearZeroPredictiveResiduals() {
