@@ -32,9 +32,14 @@ public final class MarkdownDiagnosticsRenderer {
     private String explain(String best, Map<String, FilteredStreamDiagnostics> d) {
         var b = d.get(best);
         if (b == null) return "Best strategy balances entropy and repetition heuristics.";
-        if (best.equals("fixed-none") && b.repetitionMetrics().repeated32ByteSubstrings() > 0) return "fixed-none likely wins because it preserves more repeated row/subrow structure despite having higher entropy.";
-        if (best.equals("entropy")) return "entropy likely wins because it lowers byte entropy without significantly reducing repeated substrings.";
-        if (best.equals("fixed-up") || b.rowsEqualToPrevious() > 0) return "fixed-up likely wins because many rows are similar to the previous row.";
-        return best + " likely wins from a favorable tradeoff between entropy and repeated-substring signals.";
+        double ratio = b.directionalSmoothness().verticalHorizontalRatio();
+        var r = b.residualDiagnostics();
+        if (best.equals("fixed-none") && b.repetitionMetrics().repeated32ByteSubstrings() > 0) return "NONE preserves repeated row structures despite higher entropy, improving downstream DEFLATE matches.";
+        if (ratio < 0.8) return "Vertical smoothness is stronger than horizontal smoothness, which likely favors UP-style prediction.";
+        if (ratio > 1.25) return "Horizontal coherence dominates vertical coherence, making SUB-style prediction effective.";
+        long minResidual = Math.min(Math.min(Math.min(r.noneSumAbs(), r.subSumAbs()), Math.min(r.upSumAbs(), r.averageSumAbs())), r.paethSumAbs());
+        if (minResidual == r.paethSumAbs()) return "Residual diagnostics favor PAETH, suggesting mixed local smoothness where Paeth's predictor is robust.";
+        if (best.equals("entropy")) return "entropy likely wins because it lowers byte entropy without giving up too much repetition structure.";
+        return best + " likely wins from a favorable tradeoff between entropy, directional smoothness, and residual signals.";
     }
 }

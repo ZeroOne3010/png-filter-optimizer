@@ -159,6 +159,8 @@ class CliBehaviorTest {
         String jsonText = Files.readString(jsonPath);
         assertTrue(mdText.contains("## Diagnostics"));
         assertTrue(mdText.contains("Filter distribution"));
+        assertTrue(mdText.contains("## Directional smoothness"));
+        assertTrue(mdText.contains("## Residual sumAbs"));
         assertTrue(mdText.contains("approximate LZ longest-match estimation"));
         var json = new ObjectMapper().readTree(jsonText);
         assertTrue(json.get("images").get(0).has("diagnostics"));

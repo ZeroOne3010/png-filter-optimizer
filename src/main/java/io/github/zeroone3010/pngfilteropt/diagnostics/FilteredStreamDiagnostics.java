@@ -17,6 +17,8 @@ public record FilteredStreamDiagnostics(
         int rowsEqualToPrevious,
         int mostCommonRowHashCount,
         FilterUsage filterUsage,
-        RepetitionMetrics repetitionMetrics
+        RepetitionMetrics repetitionMetrics,
+        DirectionalSmoothness directionalSmoothness,
+        ResidualDiagnostics residualDiagnostics
 ) {
 }
