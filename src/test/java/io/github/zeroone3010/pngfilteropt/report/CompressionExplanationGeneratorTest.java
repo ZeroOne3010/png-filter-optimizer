@@ -58,8 +58,8 @@ class CompressionExplanationGeneratorTest {
     @Test
     void explainsRandomNoiseAsTradeoff() {
         Map<String, FilteredStreamDiagnostics> d = new LinkedHashMap<>();
-        d.put("adaptive", diag(0, 0, 0, 20, 1.0));
-        d.put("fixed-none", diag(0, 0, 0, 20, 1.0));
+        d.put("adaptive", diag(0, 0, 0, 500, 1.0));
+        d.put("fixed-none", diag(0, 0, 0, 500, 1.0));
         String text = generator.explain("adaptive", d);
         assertTrue(text.contains("tradeoff"));
         assertFalse(text.contains("strong global back-reference opportunities"));
