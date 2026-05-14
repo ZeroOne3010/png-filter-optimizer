@@ -13,7 +13,7 @@ public final class CompressionExplanationGenerator {
         if (winner == null) return DEFAULT_MESSAGE;
 
         String winnerName = best;
-        String localBest = bestResidualFilter(winner);
+        String localBest = bestResidualFilter(diagnostics);
 
         String local = localSentence(localBest, winner);
         String global = globalSentence(winnerName, winner, diagnostics);
@@ -93,8 +93,36 @@ public final class CompressionExplanationGenerator {
         return "slightly more";
     }
 
-    private String bestResidualFilter(FilteredStreamDiagnostics winner) {
-        var r = winner.residualDiagnostics();
+    private String bestResidualFilter(Map<String, FilteredStreamDiagnostics> diagnostics) {
+        String bestFilter = "PAETH";
+        long bestScore = Long.MAX_VALUE;
+        for (var entry : diagnostics.entrySet()) {
+            long score = localResidualScore(entry.getKey(), entry.getValue());
+            if (score < bestScore) {
+                bestScore = score;
+                bestFilter = filterLabel(entry.getKey(), entry.getValue());
+            }
+        }
+        return bestFilter;
+    }
+
+    private long localResidualScore(String strategy, FilteredStreamDiagnostics diagnostics) {
+        var r = diagnostics.residualDiagnostics();
+        if (strategy.contains("none")) return r.noneSumAbs();
+        if (strategy.contains("sub")) return r.subSumAbs();
+        if (strategy.contains("up")) return r.upSumAbs();
+        if (strategy.contains("average")) return r.averageSumAbs();
+        if (strategy.contains("paeth")) return r.paethSumAbs();
+        return Math.min(Math.min(Math.min(r.noneSumAbs(), r.subSumAbs()), Math.min(r.upSumAbs(), r.averageSumAbs())), r.paethSumAbs());
+    }
+
+    private String filterLabel(String strategy, FilteredStreamDiagnostics diagnostics) {
+        if (strategy.contains("none")) return "NONE";
+        if (strategy.contains("sub")) return "SUB";
+        if (strategy.contains("up")) return "UP";
+        if (strategy.contains("average")) return "AVERAGE";
+        if (strategy.contains("paeth")) return "PAETH";
+        var r = diagnostics.residualDiagnostics();
         long min = Math.min(Math.min(Math.min(r.noneSumAbs(), r.subSumAbs()), Math.min(r.upSumAbs(), r.averageSumAbs())), r.paethSumAbs());
         if (min == r.noneSumAbs()) return "NONE";
         if (min == r.subSumAbs()) return "SUB";
