@@ -1,90 +1,142 @@
 package io.github.zeroone3010.pngfilteropt.report;
 
 import io.github.zeroone3010.pngfilteropt.diagnostics.FilteredStreamDiagnostics;
+import io.github.zeroone3010.pngfilteropt.diagnostics.LzParseDiagnostics;
 
-import java.util.Comparator;
+import java.util.Locale;
 import java.util.Map;
 
 public final class CompressionExplanationGenerator {
     private static final String DEFAULT_MESSAGE = "Compression outcome reflects a close tradeoff between local predictor precision and global DEFLATE repetition.";
+    private static final double SMALL_REPETITION_DELTA = 0.05;
+    private static final double LARGE_REPETITION_DELTA = 0.20;
 
     public String explain(String best, Map<String, FilteredStreamDiagnostics> diagnostics) {
         FilteredStreamDiagnostics winner = diagnostics.get(best);
         if (winner == null) return DEFAULT_MESSAGE;
 
-        String winnerName = best;
         String localBest = bestResidualFilter(diagnostics);
-
-        String local = localSentence(localBest, winner);
-        String global = globalSentence(winnerName, winner, diagnostics);
-        String deflate = deflateSentence(winnerName, localBest, winner, diagnostics);
+        String local = localSentence(localBest, winner, best);
+        String global = globalSentence(best, localBest, winner, diagnostics);
+        String deflate = deflateSentence(best, localBest, winner, diagnostics);
 
         return String.join(" ", local, global, deflate).trim();
     }
 
-    private String localSentence(String localBest, FilteredStreamDiagnostics winner) {
-        double ratio = winner.directionalSmoothness().verticalHorizontalRatio();
+    private String localSentence(String localBest, FilteredStreamDiagnostics winner, String best) {
+        String direction = directionalClause(winner.directionalSmoothness().verticalHorizontalRatio(), best);
         if ("PAETH".equals(localBest)) {
-            return "PAETH minimizes local residual magnitude." + directionalClause(ratio);
+            return "PAETH minimizes local residual magnitude." + direction;
         }
-        return localBest + " minimizes local residual magnitude." + directionalClause(ratio);
+        return localBest + " minimizes local residual magnitude." + direction;
     }
 
-    private String directionalClause(double ratio) {
-        if (ratio < 0.85) return " Vertical smoothness is stronger than horizontal smoothness.";
-        if (ratio > 1.20) return " Horizontal smoothness is stronger than vertical smoothness.";
+    private String directionalClause(double ratio, String best) {
+        if (ratio > 1.20) {
+            return best.contains("sub")
+                    ? " This image is strongly horizontally coherent, making SUB-style prediction particularly effective."
+                    : " Horizontal smoothness is stronger than vertical smoothness.";
+        }
+        if (ratio < 0.85) {
+            return best.contains("up")
+                    ? " This image is strongly vertically coherent, making UP-style prediction particularly effective."
+                    : " Vertical smoothness is stronger than horizontal smoothness.";
+        }
         return " Directional smoothness is balanced across axes.";
     }
 
-    private String globalSentence(String best, FilteredStreamDiagnostics winner, Map<String, FilteredStreamDiagnostics> diagnostics) {
-        int winnerRep32 = winner.repetitionMetrics().repeated32ByteSubstrings();
-        int runnerRep32 = diagnostics.entrySet().stream()
-                .filter(e -> !e.getKey().equals(best))
-                .map(e -> e.getValue().repetitionMetrics().repeated32ByteSubstrings())
-                .max(Comparator.naturalOrder())
-                .orElse(0);
-        String intensity = intensityWord(winnerRep32, runnerRep32);
-
+    private String globalSentence(String best, String localBest, FilteredStreamDiagnostics winner, Map<String, FilteredStreamDiagnostics> diagnostics) {
         if ("fixed-none".equals(best) && winner.rowsEqualToPrevious() > 0) {
-            return "However, fixed-none preserves literal row structure with " + winner.rowsEqualToPrevious() + " repeated rows, reinforcing globally repeatable byte structure for DEFLATE.";
+            return "However, fixed-none preserves literal row structure with " + winner.rowsEqualToPrevious() + " repeated rows, reinforcing exact repeated byte runs for DEFLATE back-references.";
         }
 
-        if (winnerRep32 > 0 || runnerRep32 > 0) {
-            long winnerCost = winner.lzParseDiagnostics().approximateLzCostBits();
-            long bestAltCost = diagnostics.entrySet().stream().filter(e -> !e.getKey().equals(best)).mapToLong(e -> e.getValue().lzParseDiagnostics().approximateLzCostBits()).min().orElse(winnerCost);
-            if (winnerRep32 < runnerRep32 && winnerCost < bestAltCost) {
-                return "Although alternatives have more repeated 32-byte substrings (" + winnerRep32 + " vs " + runnerRep32 + "), " + best + " has lower estimated LZ token cost and better practical match utility.";
-            }
-            String lzImpact = winnerRep32 >= runnerRep32
-                    ? "creating stronger LZ-style match opportunities."
-                    : "reducing LZ-style match opportunities relative to alternatives.";
-            return "However, " + best + " produces " + intensity + " repeated DEFLATE-friendly 32-byte substrings (" + winnerRep32 + " vs " + runnerRep32 + "), " + lzImpact;
+        FilteredStreamDiagnostics runner = bestAlternative(best, diagnostics);
+        if (runner == null) {
+            return "However, " + best + " wins on global stream structure rather than a single dominant local metric.";
         }
 
-        return "However, " + best + " wins on global stream structure rather than a single dominant local metric.";
+        int winnerRep32 = winner.repetitionMetrics().repeated32ByteSubstrings();
+        int runnerRep32 = runner.repetitionMetrics().repeated32ByteSubstrings();
+        double repDelta = relativeDelta(winnerRep32, runnerRep32);
+
+        LzParseDiagnostics winnerLz = winner.lzParseDiagnostics();
+        LzParseDiagnostics runnerLz = runner.lzParseDiagnostics();
+
+        boolean betterCost = winnerLz.approximateLzCostBits() < runnerLz.approximateLzCostBits();
+        boolean betterLength = winnerLz.averageMatchLength() > runnerLz.averageMatchLength();
+        boolean betterDistance = shortDistanceShare(winnerLz) > shortDistanceShare(runnerLz);
+
+        if (Math.abs(repDelta) < SMALL_REPETITION_DELTA && betterCost && betterLength && betterDistance) {
+            return String.format(Locale.ROOT,
+                    "Repetition metrics are broadly similar (%d vs %d repeated 32-byte substrings), but %s has lower estimated LZ token cost, longer average matches, and more short-distance matches, indicating a simpler and more stationary residual stream.",
+                    winnerRep32, runnerRep32, best);
+        }
+        if (Math.abs(repDelta) < SMALL_REPETITION_DELTA && (betterCost || betterLength || betterDistance)) {
+            return String.format(Locale.ROOT,
+                    "Repetition metrics are broadly similar (%d vs %d repeated 32-byte substrings), and match quality differs more than raw repetition count; %s shows the stronger local match structure overall.",
+                    winnerRep32, runnerRep32, best);
+        }
+
+        if (repDelta <= -LARGE_REPETITION_DELTA && betterCost) {
+            return "Although alternatives show substantially more repeated 32-byte substrings, " + best + " still achieves lower estimated LZ token cost, suggesting better match quality and token efficiency.";
+        }
+
+        return "However, " + best + " produces " + intensityWord(winnerRep32, runnerRep32) + " repeated DEFLATE-friendly 32-byte substrings ("
+                + winnerRep32 + " vs " + runnerRep32 + "), strengthening global repeat structure.";
     }
 
     private String deflateSentence(String best, String localBest, FilteredStreamDiagnostics winner, Map<String, FilteredStreamDiagnostics> diagnostics) {
-        boolean localConflict = !best.toUpperCase().contains(localBest);
-        int winnerLongest = winner.repetitionMetrics().longest32KiBMatch();
-        int maxLongest = diagnostics.values().stream().mapToInt(v -> v.repetitionMetrics().longest32KiBMatch()).max().orElse(0);
+        FilteredStreamDiagnostics runner = bestAlternative(best, diagnostics);
+        boolean localConflict = !best.toUpperCase(Locale.ROOT).contains(localBest);
 
-        if (localConflict && "PAETH".equals(localBest)) {
-            return best + " outperforms PAETH overall because global repetition outweighs local residual minimization for final DEFLATE size.";
+        if (runner == null) return DEFAULT_MESSAGE;
+
+        LzParseDiagnostics winnerLz = winner.lzParseDiagnostics();
+        LzParseDiagnostics runnerLz = runner.lzParseDiagnostics();
+        int winnerRep32 = winner.repetitionMetrics().repeated32ByteSubstrings();
+        int runnerRep32 = runner.repetitionMetrics().repeated32ByteSubstrings();
+        double repDelta = relativeDelta(winnerRep32, runnerRep32);
+
+        if (localConflict && "PAETH".equals(localBest) && repDelta >= LARGE_REPETITION_DELTA) {
+            return best + " outperforms PAETH overall because stronger global repetition dominates local residual minimization for final DEFLATE size.";
         }
+
+        if (localConflict && "PAETH".equals(localBest)
+                && winnerLz.approximateLzCostBits() < runnerLz.approximateLzCostBits()) {
+            return "Although PAETH slightly minimizes residual magnitude better, " + best + " generates a more compression-friendly residual stream with better match lengths, nearer references, and lower estimated LZ token cost.";
+        }
+
         if ("fixed-paeth".equals(best) || "paeth".equals(best)) {
             return "PAETH wins because predictor precision and global repetition are aligned in this stream.";
         }
-        if (winnerLongest > 0 && winnerLongest == maxLongest) {
-            return best + " also reaches the strongest long-range residual match depth, further improving compression-friendly repetition.";
-        }
         if ("fixed-sub".equals(best)) {
-            return "fixed-sub benefits from scanline-local residual structure that translates into stable DEFLATE back-references.";
+            return "fixed-sub benefits from scanline-local residual simplicity that translates into stable DEFLATE back-references.";
         }
         if ("fixed-up".equals(best)) {
-            return "fixed-up benefits from vertically coherent residual structure that translates into stable DEFLATE back-references.";
+            return "fixed-up benefits from vertically coherent residual simplicity that translates into stable DEFLATE back-references.";
         }
         return DEFAULT_MESSAGE;
+    }
+
+    private double shortDistanceShare(LzParseDiagnostics lz) {
+        long[] b = lz.matchDistanceBuckets();
+        long total = 0;
+        for (long v : b) total += v;
+        if (total == 0) return 0;
+        return b[0] / (double) total;
+    }
+
+    private FilteredStreamDiagnostics bestAlternative(String best, Map<String, FilteredStreamDiagnostics> diagnostics) {
+        return diagnostics.entrySet().stream()
+                .filter(e -> !e.getKey().equals(best))
+                .min(Map.Entry.comparingByValue((a, b) -> Long.compare(a.lzParseDiagnostics().approximateLzCostBits(), b.lzParseDiagnostics().approximateLzCostBits())))
+                .map(Map.Entry::getValue)
+                .orElse(null);
+    }
+
+    private double relativeDelta(int winner, int runner) {
+        if (runner <= 0) return winner > 0 ? 1.0 : 0.0;
+        return (winner - runner) / (double) runner;
     }
 
     private String intensityWord(int winner, int runner) {
