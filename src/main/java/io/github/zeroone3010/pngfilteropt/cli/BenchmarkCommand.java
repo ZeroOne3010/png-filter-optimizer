@@ -14,6 +14,7 @@ import io.github.zeroone3010.pngfilteropt.png.*;
 import io.github.zeroone3010.pngfilteropt.report.MarkdownDiagnosticsRenderer;
 import io.github.zeroone3010.pngfilteropt.zopfli.ZopfliRunner;
 import picocli.CommandLine.*;
+import picocli.CommandLine.Model.CommandSpec;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
