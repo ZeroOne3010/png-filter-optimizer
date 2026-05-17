@@ -18,6 +18,7 @@ import picocli.CommandLine.Model.CommandSpec;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -51,9 +52,25 @@ public final class BenchmarkCommand implements Runnable {
                 CliOptions.OptimizerName.FIXED_AVERAGE, new FixedFilterOptimizer(PngFilter.AVERAGE), CliOptions.OptimizerName.FIXED_PAETH, new FixedFilterOptimizer(PngFilter.PAETH));
 
         List<Map<String, Object>> images = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
         var diagnosticsCalculator = new DiagnosticsCalculator(diagnosticsLz, diagnosticsLzMaxCandidates);
         for (Path png : discoverPngFiles(directory)) {
-            RawImage raw = decoder.decode(png);
+            RawImage raw;
+            try {
+                raw = decoder.decode(png);
+            } catch (RuntimeException e) {
+                String reason = detectNonPngHint(png);
+                String relative = directory.relativize(png).toString();
+                skipped.add(relative + " :: " + e.getClass().getSimpleName() + (reason.isBlank() ? "" : " (" + reason + ")"));
+                spec.commandLine().getErr().printf(
+                        "[WARN] Skipping unreadable PNG: %s%n        reason: %s%s%n",
+                        png,
+                        e.getMessage(),
+                        reason.isBlank() ? "" : "\n        hint: " + reason
+                );
+                spec.commandLine().getErr().flush();
+                continue;
+            }
             Map<String, Long> strategies = new LinkedHashMap<>();
             strategies.put("original", fileSize(png));
 
@@ -96,6 +113,9 @@ public final class BenchmarkCommand implements Runnable {
             images.add(row);
         }
         String markdown = renderMarkdown(images); if (diagnostics) markdown += new MarkdownDiagnosticsRenderer().render(images);
+        if (!skipped.isEmpty()) {
+            markdown += "\nSkipped files (decode errors):\n" + skipped.stream().map(s -> "- " + s).collect(Collectors.joining("\n")) + "\n";
+        }
         String json = renderJson(images);
         spec.commandLine().getOut().print(markdown);
         spec.commandLine().getOut().flush();
@@ -116,6 +136,27 @@ public final class BenchmarkCommand implements Runnable {
     private static long estimateDeflatedSize(FilteredImage image) { try { ByteArrayOutputStream raw = new ByteArrayOutputStream(); for (var row : image.rows()) { raw.write(row.filter().pngValue()); raw.write(row.filteredBytes()); } ByteArrayOutputStream compressed = new ByteArrayOutputStream(); try (DeflaterOutputStream deflater = new DeflaterOutputStream(compressed)) { deflater.write(raw.toByteArray()); } return compressed.size(); } catch (IOException e) { throw new IllegalStateException(e); } }
     public static List<Path> discoverPngFiles(Path root) { try (Stream<Path> stream = Files.walk(root)) { return stream.filter(Files::isRegularFile).filter(p -> p.getFileName().toString().toLowerCase().endsWith(".png")).sorted().toList(); } catch (IOException e) { throw new IllegalStateException(e); } }
     private static long fileSize(Path p){try{return Files.size(p);}catch(IOException e){throw new IllegalStateException(e);}}
+    private static String detectNonPngHint(Path p) {
+        byte[] head = new byte[12];
+        int read;
+        try (InputStream in = Files.newInputStream(p)) {
+            read = in.read(head);
+        } catch (IOException e) {
+            return "";
+        }
+
+        if (read >= 12
+                && head[0] == 'R' && head[1] == 'I' && head[2] == 'F' && head[3] == 'F'
+                && head[8] == 'W' && head[9] == 'E' && head[10] == 'B' && head[11] == 'P') {
+            return "file header looks like WebP (RIFF....WEBP), not PNG";
+        }
+        if (read >= 8
+                && !(head[0] == (byte) 0x89 && head[1] == 0x50 && head[2] == 0x4E && head[3] == 0x47
+                && head[4] == 0x0D && head[5] == 0x0A && head[6] == 0x1A && head[7] == 0x0A)) {
+            return "PNG signature missing/invalid";
+        }
+        return "";
+    }
     private static String renderMarkdown(List<Map<String, Object>> images){ if(images.isEmpty()) return "| image | original | best |\n|---|---:|---|\n"; @SuppressWarnings("unchecked") Map<String,Long> first=(Map<String,Long>)images.get(0).get("strategies"); List<String> cols=new ArrayList<>(first.keySet()); cols.remove("original"); StringBuilder sb=new StringBuilder("| Image | Original"); for(String c:cols) sb.append(" | ").append(c); sb.append(" | Best |\n|---|---:"); for(int i=0;i<cols.size();i++) sb.append("|---:"); sb.append("|---|\n"); for(var image:images){ @SuppressWarnings("unchecked") Map<String,Long> s=(Map<String,Long>)image.get("strategies"); sb.append("| ").append(image.get("image")).append(" | ").append(s.get("original")); for(String c:cols) sb.append(" | ").append(s.get(c)); sb.append(" | ").append(image.get("best")).append(" |\n"); @SuppressWarnings("unchecked") List<String> interp=(List<String>)image.get("interpretation"); if(!interp.isEmpty()) sb.append("| ↳ interpretation | ").append(String.join("; ", interp)).append(" |").append(" |".repeat(cols.size()+1)).append("\n"); }
         return sb.toString(); }
     private static String renderJson(List<Map<String, Object>> images){ try { return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("images",images))+"\n"; } catch (JsonProcessingException e) { throw new IllegalStateException(e); } }
