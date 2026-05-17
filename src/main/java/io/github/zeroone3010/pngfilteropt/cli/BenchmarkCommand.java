@@ -98,6 +98,7 @@ public final class BenchmarkCommand implements Runnable {
         String markdown = renderMarkdown(images); if (diagnostics) markdown += new MarkdownDiagnosticsRenderer().render(images);
         String json = renderJson(images);
         spec.commandLine().getOut().print(markdown);
+        spec.commandLine().getOut().flush();
         writeIfRequested(markdownOutput, markdown); writeIfRequested(jsonOutput, json);
     }
 
