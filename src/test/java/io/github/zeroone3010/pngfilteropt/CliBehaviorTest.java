@@ -113,6 +113,24 @@ class CliBehaviorTest {
         assertEquals(0, exit);
         assertTrue(out.toString().contains("| Image | Original"));
         assertTrue(out.toString().contains("adaptive"));
+        assertFalse(out.toString().contains("↳ interpretation"));
+    }
+
+    @Test
+    void benchmarkSupportsSingleFileSelection() throws Exception {
+        Path root = Files.createTempDirectory("png-bench-single");
+        TestPngFixtures.createPng(root.resolve("one.png"), 1, 1);
+        TestPngFixtures.createPng(root.resolve("two.png"), 1, 1);
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .setOut(new java.io.PrintWriter(out, true))
+                .execute("benchmark", root.toString(), "--file", "two.png");
+
+        assertEquals(0, exit);
+        String text = out.toString();
+        assertTrue(text.contains("| two.png |"));
+        assertFalse(text.contains("| one.png |"));
     }
 
 
