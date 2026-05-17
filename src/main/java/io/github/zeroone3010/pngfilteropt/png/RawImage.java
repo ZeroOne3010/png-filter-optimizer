@@ -11,9 +11,10 @@ public record RawImage(
         int bytesPerRow,
         List<byte[]> rows,
         byte[] paletteRgb,
-        byte[] transparencyAlpha
+        byte[] transparencyAlpha,
+        int interlaceMethod
 ) {
     public RawImage(int width, int height, int bitDepth, int colorType, int bytesPerPixel, int bytesPerRow, List<byte[]> rows) {
-        this(width, height, bitDepth, colorType, bytesPerPixel, bytesPerRow, rows, null, null);
+        this(width, height, bitDepth, colorType, bytesPerPixel, bytesPerRow, rows, null, null, 0);
     }
 }

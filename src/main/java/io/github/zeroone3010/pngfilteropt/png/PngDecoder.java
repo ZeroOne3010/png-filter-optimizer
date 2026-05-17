@@ -5,6 +5,8 @@ import ar.com.hjg.pngj.chunks.PngChunkPLTE;
 import ar.com.hjg.pngj.chunks.PngChunkTRNS;
 
 import java.nio.file.Path;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,7 +52,8 @@ public final class PngDecoder {
                     info.bytesPerRow,
                     rows,
                     palette,
-                    trns
+                    trns,
+                    readInterlaceMethod(path)
             );
         } finally {
             reader.end();
@@ -65,5 +68,15 @@ public final class PngDecoder {
             return alpha ? 4 : 0;
         }
         return alpha ? 6 : 2;
+    }
+
+    private static int readInterlaceMethod(Path path) {
+        try {
+            byte[] data = Files.readAllBytes(path);
+            if (data.length < 29) return 0;
+            return data[28] & 0xFF;
+        } catch (IOException e) {
+            return 0;
+        }
     }
 }

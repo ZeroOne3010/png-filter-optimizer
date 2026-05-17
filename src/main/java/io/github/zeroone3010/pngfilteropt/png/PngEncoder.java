@@ -28,7 +28,7 @@ public final class PngEncoder {
         writeInt(ihdr, image.source().height());
         ihdr.write(image.source().bitDepth());
         ihdr.write(image.source().colorType());
-        ihdr.write(0);
+        ihdr.write(image.source().interlaceMethod());
         ihdr.write(0);
         ihdr.write(0);
         writeChunk(png, "IHDR", ihdr.toByteArray());

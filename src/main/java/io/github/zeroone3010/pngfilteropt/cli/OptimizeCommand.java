@@ -113,7 +113,7 @@ public final class OptimizeCommand implements Runnable {
         Long zopfliSize = null;
         if (optimizerSelection.zopflipngPath != null) {
             Path zopfliOutput = output.resolveSibling(output.getFileName() + ".zopfli.png");
-            zopfliSize = new ZopfliRunner().recompress(output, zopfliOutput, optimizerSelection.zopflipngPath);
+            zopfliSize = new ZopfliRunner().recompress(output, zopfliOutput, optimizerSelection.zopflipngPath, true);
             if (zopfliSize < bestSize) {
                 try {
                     java.nio.file.Files.move(zopfliOutput, output, java.nio.file.StandardCopyOption.REPLACE_EXISTING);

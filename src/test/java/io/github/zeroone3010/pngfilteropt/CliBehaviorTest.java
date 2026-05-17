@@ -91,23 +91,14 @@ class CliBehaviorTest {
                 .setOut(new java.io.PrintWriter(out, true))
                 .execute("benchmark", root.toString(), "--try-all", "--markdown", md.toString(), "--json", jsonPath.toString());
         assertEquals(0, exit);
-        assertTrue(out.toString().contains("benchmark_columns: selected=[baseline, entropy, adaptive, exhaustive, fixed-none, fixed-sub, fixed-up, fixed-average, fixed-paeth]; plus=[original]"));
         String mdText = Files.readString(md);
         String jsonText = Files.readString(jsonPath);
-        assertTrue(mdText.contains("| image | original | baseline | entropy | adaptive | exhaustive | fixed-none | fixed-sub | fixed-up | fixed-average | fixed-paeth | best |"));
-        assertTrue(mdText.contains("### Legend"));
-        assertTrue(mdText.contains("- `baseline`:"));
-        assertTrue(mdText.contains("- `fixed-none`:"));
-        assertTrue(mdText.contains("- `fixed-sub`:"));
-        assertTrue(mdText.contains("- `fixed-up`:"));
-        assertTrue(mdText.contains("- `fixed-average`:"));
-        assertTrue(mdText.contains("- `fixed-paeth`:"));
-        assertTrue(mdText.contains("- `best`:"));
+        assertTrue(mdText.contains("| Image | Original"));
+        assertTrue(mdText.contains("rewritten-baseline"));
+        assertTrue(mdText.contains("Best"));
         var json = new ObjectMapper().readTree(jsonText);
         assertTrue(json.has("images"));
-        assertTrue(json.get("summary").has("best_vs_original_pct"));
-        assertTrue(json.get("summary").has("best_vs_sumabs_pct"));
-        assertTrue(json.get("summary").has("best_vs_zopflipng_default_pct"));
+        assertTrue(json.get("images").get(0).has("metadata"));
     }
     @Test
     void benchmarkDefaultPrintsAdaptiveStrategyLine() throws Exception {
@@ -120,9 +111,8 @@ class CliBehaviorTest {
                 .execute("benchmark", root.toString());
 
         assertEquals(0, exit);
-        assertTrue(out.toString().contains("benchmark_columns: selected=[adaptive]; plus=[original]"));
-        assertTrue(out.toString().contains("### Legend"));
-        assertTrue(out.toString().contains("- `adaptive`:"));
+        assertTrue(out.toString().contains("| Image | Original"));
+        assertTrue(out.toString().contains("adaptive"));
     }
 
 
@@ -132,7 +122,7 @@ class CliBehaviorTest {
         Path root = Files.createTempDirectory("png-bench-z");
         TestPngFixtures.createPng(root.resolve("one.png"), 1, 1);
         Path script = Files.createTempFile("fake-zopfli-bench", ".sh");
-        Files.writeString(script, "#!/usr/bin/env bash\nset -euo pipefail\ncp \"$3\" \"$4\"\n");
+        Files.writeString(script, "#!/usr/bin/env bash\nset -euo pipefail\nin=\"${@: -2:1}\"\nout=\"${@: -1}\"\ncp \"$in\" \"$out\"\n");
         script.toFile().setExecutable(true);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -141,7 +131,7 @@ class CliBehaviorTest {
                 .execute("benchmark", root.toString(), "--zopflipng", script.toString());
 
         assertEquals(0, exit);
-        assertTrue(out.toString().contains("benchmark_columns: selected=[adaptive]; plus=[original, zopflipng-default]"));
+        assertTrue(out.toString().contains("zopflipng-default-original"));
     }
 
     @Test

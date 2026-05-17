@@ -5,14 +5,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 public final class ZopfliRunner {
-    public long recompress(Path input, Path output, Path executable) {
-        ProcessBuilder pb = new ProcessBuilder(
-                executable.toString(),
-                "-y",
-                "--filters=p",
-                input.toString(),
-                output.toString()
-        );
+    public long recompress(Path input, Path output, Path executable, boolean preserveFilters) {
+        ProcessBuilder pb = preserveFilters
+                ? new ProcessBuilder(executable.toString(), "-y", "--filters=p", input.toString(), output.toString())
+                : new ProcessBuilder(executable.toString(), "-y", input.toString(), output.toString());
         pb.redirectError(ProcessBuilder.Redirect.INHERIT);
         pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
         try {
