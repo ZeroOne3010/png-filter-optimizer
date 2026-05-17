@@ -50,7 +50,8 @@ public final class PngDecoder {
                     info.bytesPerRow,
                     rows,
                     palette,
-                    trns
+                    trns,
+                    info.interlaced ? 1 : 0
             );
         } finally {
             reader.end();
