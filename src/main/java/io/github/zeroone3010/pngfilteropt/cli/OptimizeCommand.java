@@ -6,6 +6,7 @@ import io.github.zeroone3010.pngfilteropt.optimize.EntropyOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FilterOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FixedFilterOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.LzBeamOptimizer;
+import io.github.zeroone3010.pngfilteropt.optimize.HierarchicalSplitOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.SumAbsOptimizer;
 import io.github.zeroone3010.pngfilteropt.png.FilteredImage;
 import io.github.zeroone3010.pngfilteropt.png.FilterInspector;
@@ -65,6 +66,7 @@ public final class OptimizeCommand implements Runnable {
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(),
                 CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
                 CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(optimizerSelection.beamWidth),
+                CliOptions.OptimizerName.HIERARCHICAL, new HierarchicalSplitOptimizer(optimizerSelection.hierarchicalMaxDepth, optimizerSelection.hierarchicalMinSegmentRows),
                 CliOptions.OptimizerName.FIXED_NONE, new FixedFilterOptimizer(PngFilter.NONE),
                 CliOptions.OptimizerName.FIXED_SUB, new FixedFilterOptimizer(PngFilter.SUB),
                 CliOptions.OptimizerName.FIXED_UP, new FixedFilterOptimizer(PngFilter.UP),

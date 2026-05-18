@@ -9,6 +9,7 @@ public final class CliOptions {
     public static final String DESC_ENTROPY = "Chooses per-row filters by Shannon entropy heuristics.";
     public static final String DESC_ADAPTIVE = "Greedy per-row sum-of-absolute-values heuristic (fast, not true global DEFLATE optimization).";
     public static final String DESC_EXHAUSTIVE = "Beam search over row filter sequences scored by LZ-style heuristics; larger --beam explores more paths but is not globally optimal.";
+    public static final String DESC_HIERARCHICAL = "Coarse-to-fine row-segment refinement scored by whole-image deflate proxy; wider context than row-local heuristics.";
     public static final String DESC_FIXED_NONE = "Forces filter 0 (NONE) for every row as a fixed reference column.";
     public static final String DESC_FIXED_SUB = "Forces filter 1 (SUB) for every row as a fixed reference column.";
     public static final String DESC_FIXED_UP = "Forces filter 2 (UP) for every row as a fixed reference column.";
@@ -33,6 +34,7 @@ public final class CliOptions {
                         "  entropy   - " + DESC_ENTROPY,
                         "  adaptive  - " + DESC_ADAPTIVE,
                         "  exhaustive- " + DESC_EXHAUSTIVE,
+                        "  hierarchical- " + DESC_HIERARCHICAL,
                         "  fixed-none   - " + DESC_FIXED_NONE,
                         "  fixed-sub    - " + DESC_FIXED_SUB,
                         "  fixed-up     - " + DESC_FIXED_UP,
@@ -62,6 +64,22 @@ public final class CliOptions {
                 description = "Beam width used by search-based optimizers (default: ${DEFAULT-VALUE})."
         )
         public int beamWidth;
+
+        @Option(
+                names = "--hier-max-depth",
+                defaultValue = "5",
+                paramLabel = "DEPTH",
+                description = "Maximum binary split depth for --optimizer hierarchical (default: ${DEFAULT-VALUE})."
+        )
+        public int hierarchicalMaxDepth;
+
+        @Option(
+                names = "--hier-min-segment-rows",
+                defaultValue = "1",
+                paramLabel = "ROWS",
+                description = "Minimum segment height considered by hierarchical optimizer (default: ${DEFAULT-VALUE})."
+        )
+        public int hierarchicalMinSegmentRows;
     }
 
     public enum OptimizerName {
@@ -69,6 +87,7 @@ public final class CliOptions {
         ENTROPY,
         ADAPTIVE,
         EXHAUSTIVE,
+        HIERARCHICAL,
         FIXED_NONE,
         FIXED_SUB,
         FIXED_UP,

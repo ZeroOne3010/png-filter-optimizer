@@ -9,6 +9,7 @@ import io.github.zeroone3010.pngfilteropt.optimize.EntropyOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FilterOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FixedFilterOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.LzBeamOptimizer;
+import io.github.zeroone3010.pngfilteropt.optimize.HierarchicalSplitOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.SumAbsOptimizer;
 import io.github.zeroone3010.pngfilteropt.png.*;
 import io.github.zeroone3010.pngfilteropt.report.MarkdownDiagnosticsRenderer;
@@ -47,7 +48,7 @@ public final class BenchmarkCommand implements Runnable {
         var selected = optimizerSelection.tryAll ? List.of(CliOptions.OptimizerName.values()) : Arrays.asList(optimizerSelection.optimizers);
         var optimizers = Map.of(
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(), CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
-                CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(optimizerSelection.beamWidth), CliOptions.OptimizerName.FIXED_NONE, new FixedFilterOptimizer(PngFilter.NONE),
+                CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(optimizerSelection.beamWidth), CliOptions.OptimizerName.HIERARCHICAL, new HierarchicalSplitOptimizer(optimizerSelection.hierarchicalMaxDepth, optimizerSelection.hierarchicalMinSegmentRows), CliOptions.OptimizerName.FIXED_NONE, new FixedFilterOptimizer(PngFilter.NONE),
                 CliOptions.OptimizerName.FIXED_SUB, new FixedFilterOptimizer(PngFilter.SUB), CliOptions.OptimizerName.FIXED_UP, new FixedFilterOptimizer(PngFilter.UP),
                 CliOptions.OptimizerName.FIXED_AVERAGE, new FixedFilterOptimizer(PngFilter.AVERAGE), CliOptions.OptimizerName.FIXED_PAETH, new FixedFilterOptimizer(PngFilter.PAETH));
 
@@ -72,6 +73,7 @@ public final class BenchmarkCommand implements Runnable {
                 continue;
             }
             Map<String, Long> strategies = new LinkedHashMap<>();
+            Map<String, Long> timingsMs = new LinkedHashMap<>();
             strategies.put("original", fileSize(png));
 
             FilteredImage rewrittenBaseline = buildBaseline(raw, inspector.listFilters(png, raw), candidates);
@@ -93,7 +95,9 @@ public final class BenchmarkCommand implements Runnable {
             Map<String, Object> strategyDiagnostics = new LinkedHashMap<>();
             for (CliOptions.OptimizerName name : selected) {
                 String key = name.name().toLowerCase().replace('_', '-');
+                long started = System.nanoTime();
                 FilteredImage optimized = name == CliOptions.OptimizerName.BASELINE ? rewrittenBaseline : optimizers.get(name).optimize(raw, candidates);
+                timingsMs.put(key, java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
                 strategies.put(key, estimateDeflatedSize(optimized));
                 if (diagnostics) strategyDiagnostics.put(key, diagnosticsCalculator.calculate(optimized));
             }
@@ -109,6 +113,7 @@ public final class BenchmarkCommand implements Runnable {
             row.put("image", directory.relativize(png).toString()); row.put("strategies", strategies); row.put("best", bestKey(strategies));
             row.put("metadata", Map.of("original_color_type", raw.colorType(), "rewritten_color_type", raw.colorType(), "original_bit_depth", raw.bitDepth(), "rewritten_bit_depth", raw.bitDepth(), "palette_preserved", raw.paletteRgb() != null, "interlace_preserved", raw.interlaceMethod() == 0 || raw.interlaceMethod() == 1));
             row.put("interpretation", interpretations(strategies));
+            row.put("timings_ms", timingsMs);
             if (diagnostics) row.put("diagnostics", strategyDiagnostics);
             images.add(row);
         }
@@ -158,6 +163,13 @@ public final class BenchmarkCommand implements Runnable {
         return "";
     }
     private static String renderMarkdown(List<Map<String, Object>> images){ if(images.isEmpty()) return "| image | original | best |\n|---|---:|---|\n"; @SuppressWarnings("unchecked") Map<String,Long> first=(Map<String,Long>)images.get(0).get("strategies"); List<String> cols=new ArrayList<>(first.keySet()); cols.remove("original"); StringBuilder sb=new StringBuilder("| Image | Original"); for(String c:cols) sb.append(" | ").append(c); sb.append(" | Best |\n|---|---:"); for(int i=0;i<cols.size();i++) sb.append("|---:"); sb.append("|---|\n"); for(var image:images){ @SuppressWarnings("unchecked") Map<String,Long> s=(Map<String,Long>)image.get("strategies"); sb.append("| ").append(image.get("image")).append(" | ").append(s.get("original")); for(String c:cols) sb.append(" | ").append(s.get(c)); sb.append(" | ").append(image.get("best")).append(" |\n"); @SuppressWarnings("unchecked") List<String> interp=(List<String>)image.get("interpretation"); if(!interp.isEmpty()) sb.append("| ↳ interpretation | ").append(String.join("; ", interp)).append(" |").append(" |".repeat(cols.size()+1)).append("\n"); }
+        sb.append("\n### Strategy timing (ms)\n");
+        sb.append("| Image");
+        for(String c:cols) sb.append(" | ").append(c);
+        sb.append(" |\n|---");
+        for(int i=0;i<cols.size();i++) sb.append("|---:");
+        sb.append("|\n");
+        for(var image:images){ @SuppressWarnings("unchecked") Map<String,Long> t=(Map<String,Long>)image.get("timings_ms"); sb.append("| ").append(image.get("image")); for(String c:cols) sb.append(" | ").append(t.getOrDefault(c,0L)); sb.append(" |\n"); }
         return sb.toString(); }
     private static String renderJson(List<Map<String, Object>> images){ try { return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("images",images))+"\n"; } catch (JsonProcessingException e) { throw new IllegalStateException(e); } }
     private static void writeIfRequested(Path output, String content) { if (output == null) return; try { if (output.getParent() != null) Files.createDirectories(output.getParent()); Files.writeString(output, content); } catch (IOException e) { throw new IllegalStateException(e); } }

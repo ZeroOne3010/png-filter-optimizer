@@ -44,6 +44,22 @@ class CliBehaviorTest {
         assertTrue(out.toString().contains("output_bytes="));
     }
 
+
+    @Test
+    void optimizeHierarchicalRunsWithTunables() throws Exception {
+        Path input = TestPngFixtures.createPng(Files.createTempFile("opt-h", ".png"), 4, 4);
+        Path output = Files.createTempFile("opt-h-out", ".png");
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+        int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .setOut(new java.io.PrintWriter(out, true))
+                .execute("optimize", input.toString(), output.toString(), "--optimizer", "hierarchical", "--hier-max-depth", "3", "--hier-min-segment-rows", "1");
+
+        assertEquals(0, exit);
+        assertTrue(Files.size(output) > 0);
+        assertTrue(out.toString().contains("strategy=hierarchical"));
+    }
+
     @Test
     void optimizeWithZopfliKeepsSmallerResult() throws Exception {
         Path input = TestPngFixtures.createPng(Files.createTempFile("opt-z", ".png"), 3, 3);
@@ -96,9 +112,11 @@ class CliBehaviorTest {
         assertTrue(mdText.contains("| Image | Original"));
         assertTrue(mdText.contains("rewritten-baseline"));
         assertTrue(mdText.contains("Best"));
+        assertTrue(mdText.contains("Strategy timing (ms)"));
         var json = new ObjectMapper().readTree(jsonText);
         assertTrue(json.has("images"));
         assertTrue(json.get("images").get(0).has("metadata"));
+        assertTrue(json.get("images").get(0).has("timings_ms"));
     }
     @Test
     void benchmarkDefaultPrintsAdaptiveStrategyLine() throws Exception {
