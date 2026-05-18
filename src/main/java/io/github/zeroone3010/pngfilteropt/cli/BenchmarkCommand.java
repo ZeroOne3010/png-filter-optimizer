@@ -9,6 +9,7 @@ import io.github.zeroone3010.pngfilteropt.optimize.EntropyOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FilterOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FixedFilterOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.LzBeamOptimizer;
+import io.github.zeroone3010.pngfilteropt.optimize.HierarchicalSplitOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.SumAbsOptimizer;
 import io.github.zeroone3010.pngfilteropt.png.*;
 import io.github.zeroone3010.pngfilteropt.report.MarkdownDiagnosticsRenderer;
@@ -48,7 +49,7 @@ public final class BenchmarkCommand implements Runnable {
         var selected = optimizerSelection.tryAll ? List.of(CliOptions.OptimizerName.values()) : Arrays.asList(optimizerSelection.optimizers);
         var optimizers = Map.of(
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(), CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
-                CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(optimizerSelection.beamWidth), CliOptions.OptimizerName.FIXED_NONE, new FixedFilterOptimizer(PngFilter.NONE),
+                CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(optimizerSelection.beamWidth), CliOptions.OptimizerName.HIERARCHICAL, new HierarchicalSplitOptimizer(optimizerSelection.hierMaxDepth, optimizerSelection.hierMinSegmentRows), CliOptions.OptimizerName.FIXED_NONE, new FixedFilterOptimizer(PngFilter.NONE),
                 CliOptions.OptimizerName.FIXED_SUB, new FixedFilterOptimizer(PngFilter.SUB), CliOptions.OptimizerName.FIXED_UP, new FixedFilterOptimizer(PngFilter.UP),
                 CliOptions.OptimizerName.FIXED_AVERAGE, new FixedFilterOptimizer(PngFilter.AVERAGE), CliOptions.OptimizerName.FIXED_PAETH, new FixedFilterOptimizer(PngFilter.PAETH));
 
@@ -73,28 +74,39 @@ public final class BenchmarkCommand implements Runnable {
                 continue;
             }
             Map<String, Long> strategies = new LinkedHashMap<>();
+            Map<String, Long> timingsMs = new LinkedHashMap<>();
             strategies.put("original", fileSize(png));
+            timingsMs.put("original", 0L);
 
             FilteredImage rewrittenBaseline = buildBaseline(raw, inspector.listFilters(png, raw), candidates);
             long rewrittenBaselineSize = estimateDeflatedSize(rewrittenBaseline);
             strategies.put("rewritten-baseline", rewrittenBaselineSize);
+            timingsMs.put("rewritten-baseline", 0L);
 
             Path tmpDir = tempDir();
             if (optimizerSelection.zopflipngPath != null && benchmarkControls && benchmarkZopfliOriginal) {
                 ZopfliRunner runner = new ZopfliRunner();
+                long t0 = System.nanoTime();
                 strategies.put("zopflipng-default-original", runner.recompress(png, tmpDir.resolve("zdefault.png"), optimizerSelection.zopflipngPath, false));
+                timingsMs.put("zopflipng-default-original", nanosToMillis(System.nanoTime() - t0));
                 if (benchmarkPreserveOriginalFilters) {
+                    t0 = System.nanoTime();
                     strategies.put("zopflipng-preserve-original-filters", runner.recompress(png, tmpDir.resolve("zpreserve-original.png"), optimizerSelection.zopflipngPath, true));
+                    timingsMs.put("zopflipng-preserve-original-filters", nanosToMillis(System.nanoTime() - t0));
                 }
                 Path rewrittenPath = tmpDir.resolve("rewritten.png");
                 encoder.encode(rewrittenBaseline, rewrittenPath);
+                t0 = System.nanoTime();
                 strategies.put("rewritten+zopfli-preserve", runner.recompress(rewrittenPath, tmpDir.resolve("rewritten-zopfli.png"), optimizerSelection.zopflipngPath, true));
+                timingsMs.put("rewritten+zopfli-preserve", nanosToMillis(System.nanoTime() - t0));
             }
 
             Map<String, Object> strategyDiagnostics = new LinkedHashMap<>();
             for (CliOptions.OptimizerName name : selected) {
                 String key = name.name().toLowerCase().replace('_', '-');
+                long t0 = System.nanoTime();
                 FilteredImage optimized = name == CliOptions.OptimizerName.BASELINE ? rewrittenBaseline : optimizers.get(name).optimize(raw, candidates);
+                timingsMs.put(key, nanosToMillis(System.nanoTime() - t0));
                 strategies.put(key, estimateDeflatedSize(optimized));
                 if (diagnostics) strategyDiagnostics.put(key, diagnosticsCalculator.calculate(optimized));
             }
@@ -107,7 +119,7 @@ public final class BenchmarkCommand implements Runnable {
             }
 
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("image", imageLabel(png)); row.put("strategies", strategies); row.put("best", bestKey(strategies));
+            row.put("image", imageLabel(png)); row.put("strategies", strategies); row.put("timings_ms", timingsMs); row.put("best", bestKey(strategies));
             row.put("metadata", Map.of("original_color_type", raw.colorType(), "rewritten_color_type", raw.colorType(), "original_bit_depth", raw.bitDepth(), "rewritten_bit_depth", raw.bitDepth(), "palette_preserved", raw.paletteRgb() != null, "interlace_preserved", raw.interlaceMethod() == 0 || raw.interlaceMethod() == 1));
             if (diagnostics) row.put("diagnostics", strategyDiagnostics);
             images.add(row);
@@ -168,6 +180,8 @@ public final class BenchmarkCommand implements Runnable {
         }
         return "";
     }
+    private static long nanosToMillis(long nanos) { return Math.max(0L, nanos / 1_000_000L); }
+
     private static String formatNumber(long value) {
         String digits = Long.toString(Math.abs(value));
         StringBuilder out = new StringBuilder();
@@ -202,7 +216,15 @@ public final class BenchmarkCommand implements Runnable {
             sb.append(" | ").append(image.get("best")).append(" |\n");
         }
         sb.append("\n");
-        for(var image:images) sb.append("### ").append(image.get("image")).append("\n\n");
+        for(var image:images){
+            sb.append("### ").append(image.get("image")).append("\n\n");
+            @SuppressWarnings("unchecked") Map<String,Long> t=(Map<String,Long>)image.get("timings_ms");
+            if(t!=null){
+                sb.append("Timing (ms):\n\n");
+                for (var e : t.entrySet()) sb.append("- ").append(e.getKey()).append(": ").append(e.getValue()).append(" ms\n");
+                sb.append("\n");
+            }
+        }
         return sb.toString();
     }
 

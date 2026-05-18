@@ -44,6 +44,19 @@ class CliBehaviorTest {
         assertTrue(out.toString().contains("output_bytes="));
     }
 
+
+    @Test
+    void optimizeSupportsHierarchicalOptimizer() throws Exception {
+        Path input = TestPngFixtures.createPng(Files.createTempFile("opt-hier", ".png"), 4, 4);
+        Path output = Files.createTempFile("opt-hier-out", ".png");
+
+        int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute("optimize", input.toString(), output.toString(), "--optimizer", "hierarchical", "--hier-max-depth", "4", "--hier-min-segment-rows", "1");
+
+        assertEquals(0, exit);
+        assertTrue(Files.size(output) > 0);
+    }
     @Test
     void optimizeWithZopfliKeepsSmallerResult() throws Exception {
         Path input = TestPngFixtures.createPng(Files.createTempFile("opt-z", ".png"), 3, 3);
@@ -99,6 +112,8 @@ class CliBehaviorTest {
         var json = new ObjectMapper().readTree(jsonText);
         assertTrue(json.has("images"));
         assertTrue(json.get("images").get(0).has("metadata"));
+        assertTrue(json.get("images").get(0).has("timings_ms"));
+        assertTrue(mdText.contains("Timing (ms):"));
     }
     @Test
     void benchmarkDefaultPrintsAdaptiveStrategyLine() throws Exception {
