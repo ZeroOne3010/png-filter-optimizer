@@ -60,7 +60,7 @@ public final class HierarchicalSplitOptimizer implements FilterOptimizer {
                     improvedInPass = true;
                 }
             }
-            if (!improvedInPass) break;
+            if (depth > 0 && !improvedInPass) break;
         }
 
         return new FilteredImage(image, incumbent);
