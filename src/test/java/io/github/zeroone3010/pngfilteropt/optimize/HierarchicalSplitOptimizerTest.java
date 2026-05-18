@@ -1,7 +1,7 @@
-package io.github.zeroone3010.pngfilteropt.optimize;
+package io.github.zeroone3010.pngfilteropt;
 
-import io.github.zeroone3010.pngfilteropt.TestPngFixtures;
 import io.github.zeroone3010.pngfilteropt.filter.CandidateGenerator;
+import io.github.zeroone3010.pngfilteropt.optimize.HierarchicalSplitOptimizer;
 import io.github.zeroone3010.pngfilteropt.png.PngDecoder;
 import org.junit.jupiter.api.Test;
 
