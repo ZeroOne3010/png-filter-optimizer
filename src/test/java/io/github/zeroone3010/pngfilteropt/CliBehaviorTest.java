@@ -51,6 +51,7 @@ class CliBehaviorTest {
         Path output = Files.createTempFile("opt-hier-out", ".png");
 
         int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .setCaseInsensitiveEnumValuesAllowed(true)
                 .execute("optimize", input.toString(), output.toString(), "--optimizer", "hierarchical", "--hier-max-depth", "4", "--hier-min-segment-rows", "1");
 
         assertEquals(0, exit);
