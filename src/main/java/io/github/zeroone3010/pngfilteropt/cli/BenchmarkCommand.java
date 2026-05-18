@@ -31,6 +31,7 @@ public final class BenchmarkCommand implements Runnable {
     private static final ObjectMapper JSON = new ObjectMapper();
     @Spec CommandSpec spec;
     @Parameters(index = "0", arity = "0..1", defaultValue = "src/test/resources/test-images") Path directory;
+    @Option(names = "--file", description = "Benchmark only a single PNG file (absolute path or path relative to benchmark directory).") Path singleFile;
     @Mixin CliOptions.OptimizerSelection optimizerSelection;
     @Option(names = "--markdown") Path markdownOutput;
     @Option(names = "--json") Path jsonOutput;
@@ -54,14 +55,14 @@ public final class BenchmarkCommand implements Runnable {
         List<Map<String, Object>> images = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
         var diagnosticsCalculator = new DiagnosticsCalculator(diagnosticsLz, diagnosticsLzMaxCandidates);
-        for (Path png : discoverPngFiles(directory)) {
+        for (Path png : benchmarkTargets()) {
             RawImage raw;
             try {
                 raw = decoder.decode(png);
             } catch (RuntimeException e) {
                 String reason = detectNonPngHint(png);
-                String relative = directory.relativize(png).toString();
-                skipped.add(relative + " :: " + e.getClass().getSimpleName() + (reason.isBlank() ? "" : " (" + reason + ")"));
+                String imageLabel = imageLabel(png);
+                skipped.add(imageLabel + " :: " + e.getClass().getSimpleName() + (reason.isBlank() ? "" : " (" + reason + ")"));
                 spec.commandLine().getErr().printf(
                         "[WARN] Skipping unreadable PNG: %s%n        reason: %s%s%n",
                         png,
@@ -106,9 +107,8 @@ public final class BenchmarkCommand implements Runnable {
             }
 
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("image", directory.relativize(png).toString()); row.put("strategies", strategies); row.put("best", bestKey(strategies));
+            row.put("image", imageLabel(png)); row.put("strategies", strategies); row.put("best", bestKey(strategies));
             row.put("metadata", Map.of("original_color_type", raw.colorType(), "rewritten_color_type", raw.colorType(), "original_bit_depth", raw.bitDepth(), "rewritten_bit_depth", raw.bitDepth(), "palette_preserved", raw.paletteRgb() != null, "interlace_preserved", raw.interlaceMethod() == 0 || raw.interlaceMethod() == 1));
-            row.put("interpretation", interpretations(strategies));
             if (diagnostics) row.put("diagnostics", strategyDiagnostics);
             images.add(row);
         }
@@ -122,15 +122,26 @@ public final class BenchmarkCommand implements Runnable {
         writeIfRequested(markdownOutput, markdown); writeIfRequested(jsonOutput, json);
     }
 
-    private static List<String> interpretations(Map<String, Long> s){ List<String> out=new ArrayList<>();
-        if(has(s,"zopflipng-default-original","original")&&s.get("zopflipng-default-original")+16<s.get("original")) out.add("Case A: Zopfli default beats original significantly; source encoder likely weak.");
-        if(has(s,"zopflipng-preserve-original-filters","zopflipng-default-original")&&Math.abs(s.get("zopflipng-preserve-original-filters")-s.get("zopflipng-default-original"))<=16) out.add("Case B: Original filters are already strong under Zopfli.");
-        if(has(s,"rewritten+zopfli-preserve","zopflipng-preserve-original-filters")&&s.get("rewritten+zopfli-preserve")>s.get("zopflipng-preserve-original-filters")) out.add("Case C: Our filters underperform original filters under equal Zopfli recompression.");
-        if(has(s,"rewritten-baseline","original")&&Math.abs(s.get("rewritten-baseline")-s.get("original"))>64) out.add("Case D: Rewriting changes compression characteristics.");
-        if(has(s,"rewritten+zopfli-preserve","zopflipng-preserve-original-filters")&&s.get("rewritten+zopfli-preserve")<s.get("zopflipng-preserve-original-filters")) out.add("Case E: Our filters improve over original filters under equal Zopfli recompression.");
-        return out; }
-    private static boolean has(Map<String, Long>s,String a,String b){return s.containsKey(a)&&s.containsKey(b);}    
+    private List<Path> benchmarkTargets() {
+        if (singleFile == null) return discoverPngFiles(directory);
+        Path candidate = singleFile.isAbsolute() ? singleFile : directory.resolve(singleFile).normalize();
+        if (!Files.exists(candidate) || !Files.isRegularFile(candidate)) {
+            throw new ParameterException(spec.commandLine(), "--file does not point to a readable file: " + singleFile);
+        }
+        if (!candidate.getFileName().toString().toLowerCase().endsWith(".png")) {
+            throw new ParameterException(spec.commandLine(), "--file must point to a .png file: " + singleFile);
+        }
+        return List.of(candidate);
+    }
+
     private static String bestKey(Map<String, Long> s){ return s.entrySet().stream().filter(e->!e.getKey().startsWith("delta-")).min(Comparator.comparingLong(Map.Entry::getValue)).orElseThrow().getKey(); }
+    private String imageLabel(Path png) {
+        try {
+            return directory.relativize(png).toString();
+        } catch (IllegalArgumentException e) {
+            return png.toString();
+        }
+    }
     private static FilteredImage buildBaseline(RawImage raw, List<PngFilter> inputFilters, CandidateGenerator candidates){ List<FilteredRow> rows=new ArrayList<>(raw.height()); for(int y=0;y<raw.height();y++){PngFilter f=inputFilters.get(y); rows.add(candidates.generateCandidates(raw,y).stream().filter(c->c.filter()==f).findFirst().orElseThrow());} return new FilteredImage(raw, rows);}    
     private static Path tempDir(){ try{return Files.createTempDirectory("bench-png");}catch(IOException e){throw new IllegalStateException(e);} }
     private static long estimateDeflatedSize(FilteredImage image) { try { ByteArrayOutputStream raw = new ByteArrayOutputStream(); for (var row : image.rows()) { raw.write(row.filter().pngValue()); raw.write(row.filteredBytes()); } ByteArrayOutputStream compressed = new ByteArrayOutputStream(); try (DeflaterOutputStream deflater = new DeflaterOutputStream(compressed)) { deflater.write(raw.toByteArray()); } return compressed.size(); } catch (IOException e) { throw new IllegalStateException(e); } }
@@ -157,8 +168,44 @@ public final class BenchmarkCommand implements Runnable {
         }
         return "";
     }
-    private static String renderMarkdown(List<Map<String, Object>> images){ if(images.isEmpty()) return "| image | original | best |\n|---|---:|---|\n"; @SuppressWarnings("unchecked") Map<String,Long> first=(Map<String,Long>)images.get(0).get("strategies"); List<String> cols=new ArrayList<>(first.keySet()); cols.remove("original"); StringBuilder sb=new StringBuilder("| Image | Original"); for(String c:cols) sb.append(" | ").append(c); sb.append(" | Best |\n|---|---:"); for(int i=0;i<cols.size();i++) sb.append("|---:"); sb.append("|---|\n"); for(var image:images){ @SuppressWarnings("unchecked") Map<String,Long> s=(Map<String,Long>)image.get("strategies"); sb.append("| ").append(image.get("image")).append(" | ").append(s.get("original")); for(String c:cols) sb.append(" | ").append(s.get(c)); sb.append(" | ").append(image.get("best")).append(" |\n"); @SuppressWarnings("unchecked") List<String> interp=(List<String>)image.get("interpretation"); if(!interp.isEmpty()) sb.append("| ↳ interpretation | ").append(String.join("; ", interp)).append(" |").append(" |".repeat(cols.size()+1)).append("\n"); }
-        return sb.toString(); }
+    private static String formatNumber(long value) {
+        String digits = Long.toString(Math.abs(value));
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < digits.length(); i++) {
+            if (i > 0 && (digits.length() - i) % 3 == 0) out.append('\u2007');
+            out.append(digits.charAt(i));
+        }
+        return value < 0 ? "-" + out : out.toString();
+    }
+
+    private static String renderMarkdown(List<Map<String, Object>> images){
+        if(images.isEmpty()) return "| image | original | best |\n|---|---:|---|\n";
+        @SuppressWarnings("unchecked") Map<String,Long> first=(Map<String,Long>)images.get(0).get("strategies");
+        List<String> cols=new ArrayList<>(first.keySet());
+        cols.remove("original");
+        cols.remove("baseline");
+
+        StringBuilder sb=new StringBuilder("## Benchmark summary\n\n");
+        sb.append("Original = input PNG size on disk. Rewritten baseline = the same per-row filters rebuilt through this tool and then DEFLATE-estimated; this isolates rewrite/stream effects from filter-choice changes.\n\n");
+        sb.append("Compression-case guide: smaller numbers are better, and a gap between `original` and `rewritten-baseline` means the rewritten IDAT stream changed compression behavior even with equivalent row filters.\n\n");
+        sb.append("### Table of contents\n");
+        for(var image:images) sb.append("- [").append(image.get("image")).append("](#").append(image.get("image")).append(")\n");
+        sb.append("\n| Image | Original");
+        for(String c:cols) sb.append(" | ").append(c);
+        sb.append(" | Best |\n|---|---:");
+        for(int i=0;i<cols.size();i++) sb.append("|---:");
+        sb.append("|---|\n");
+        for(var image:images){
+            @SuppressWarnings("unchecked") Map<String,Long> s=(Map<String,Long>)image.get("strategies");
+            sb.append("| ").append(image.get("image")).append(" | ").append(formatNumber(s.get("original")));
+            for(String c:cols) sb.append(" | ").append(formatNumber(s.get(c)));
+            sb.append(" | ").append(image.get("best")).append(" |\n");
+        }
+        sb.append("\n");
+        for(var image:images) sb.append("### ").append(image.get("image")).append("\n\n");
+        return sb.toString();
+    }
+
     private static String renderJson(List<Map<String, Object>> images){ try { return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("images",images))+"\n"; } catch (JsonProcessingException e) { throw new IllegalStateException(e); } }
     private static void writeIfRequested(Path output, String content) { if (output == null) return; try { if (output.getParent() != null) Files.createDirectories(output.getParent()); Files.writeString(output, content); } catch (IOException e) { throw new IllegalStateException(e); } }
 }
