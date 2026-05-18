@@ -61,8 +61,8 @@ public final class BenchmarkCommand implements Runnable {
                 raw = decoder.decode(png);
             } catch (RuntimeException e) {
                 String reason = detectNonPngHint(png);
-                String relative = directory.relativize(png).toString();
-                skipped.add(relative + " :: " + e.getClass().getSimpleName() + (reason.isBlank() ? "" : " (" + reason + ")"));
+                String imageLabel = imageLabel(png);
+                skipped.add(imageLabel + " :: " + e.getClass().getSimpleName() + (reason.isBlank() ? "" : " (" + reason + ")"));
                 spec.commandLine().getErr().printf(
                         "[WARN] Skipping unreadable PNG: %s%n        reason: %s%s%n",
                         png,
@@ -107,7 +107,7 @@ public final class BenchmarkCommand implements Runnable {
             }
 
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("image", directory.relativize(png).toString()); row.put("strategies", strategies); row.put("best", bestKey(strategies));
+            row.put("image", imageLabel(png)); row.put("strategies", strategies); row.put("best", bestKey(strategies));
             row.put("metadata", Map.of("original_color_type", raw.colorType(), "rewritten_color_type", raw.colorType(), "original_bit_depth", raw.bitDepth(), "rewritten_bit_depth", raw.bitDepth(), "palette_preserved", raw.paletteRgb() != null, "interlace_preserved", raw.interlaceMethod() == 0 || raw.interlaceMethod() == 1));
             if (diagnostics) row.put("diagnostics", strategyDiagnostics);
             images.add(row);
@@ -135,6 +135,13 @@ public final class BenchmarkCommand implements Runnable {
     }
 
     private static String bestKey(Map<String, Long> s){ return s.entrySet().stream().filter(e->!e.getKey().startsWith("delta-")).min(Comparator.comparingLong(Map.Entry::getValue)).orElseThrow().getKey(); }
+    private String imageLabel(Path png) {
+        try {
+            return directory.relativize(png).toString();
+        } catch (IllegalArgumentException e) {
+            return png.toString();
+        }
+    }
     private static FilteredImage buildBaseline(RawImage raw, List<PngFilter> inputFilters, CandidateGenerator candidates){ List<FilteredRow> rows=new ArrayList<>(raw.height()); for(int y=0;y<raw.height();y++){PngFilter f=inputFilters.get(y); rows.add(candidates.generateCandidates(raw,y).stream().filter(c->c.filter()==f).findFirst().orElseThrow());} return new FilteredImage(raw, rows);}    
     private static Path tempDir(){ try{return Files.createTempDirectory("bench-png");}catch(IOException e){throw new IllegalStateException(e);} }
     private static long estimateDeflatedSize(FilteredImage image) { try { ByteArrayOutputStream raw = new ByteArrayOutputStream(); for (var row : image.rows()) { raw.write(row.filter().pngValue()); raw.write(row.filteredBytes()); } ByteArrayOutputStream compressed = new ByteArrayOutputStream(); try (DeflaterOutputStream deflater = new DeflaterOutputStream(compressed)) { deflater.write(raw.toByteArray()); } return compressed.size(); } catch (IOException e) { throw new IllegalStateException(e); } }

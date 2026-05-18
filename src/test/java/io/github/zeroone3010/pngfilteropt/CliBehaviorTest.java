@@ -133,6 +133,20 @@ class CliBehaviorTest {
         assertFalse(text.contains("| one.png |"));
     }
 
+    @Test
+    void benchmarkSupportsAbsoluteSingleFilePath() throws Exception {
+        Path root = Files.createTempDirectory("png-bench-single-abs");
+        Path one = TestPngFixtures.createPng(root.resolve("one.png"), 1, 1);
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .setOut(new java.io.PrintWriter(out, true))
+                .execute("benchmark", "--file", one.toAbsolutePath().toString());
+
+        assertEquals(0, exit);
+        assertTrue(out.toString().contains("| " + one.toAbsolutePath() + " |"));
+    }
+
 
 
     @Test
