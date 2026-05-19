@@ -6,6 +6,7 @@ import io.github.zeroone3010.pngfilteropt.png.FilteredImage;
 import io.github.zeroone3010.pngfilteropt.png.FilteredRow;
 import io.github.zeroone3010.pngfilteropt.png.RawImage;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -45,7 +46,7 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
     public FilteredImage optimize(RawImage image, CandidateGenerator candidates) {
         long deadline = System.nanoTime() + timeLimit.toNanos();
         Random random = new Random(seed);
-        var scorer = FastDeflateScorer.autoDetect();
+        var scorer = FastDeflateScorer.detected();
         List<List<FilteredRow>> rowCandidates = new ArrayList<>(image.height());
         for (int y = 0; y < image.height(); y++) rowCandidates.add(candidates.generateCandidates(image, y));
 
@@ -137,9 +138,19 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
     private record ScoredGenome(Genome genome, long score) {}
 
     private static final class FastDeflateScorer {
+        private static volatile FastDeflateScorer cached;
         private final String name; private final List<String> cmd;
         private FastDeflateScorer(String name, List<String> cmd) { this.name = name; this.cmd = cmd; }
-        static FastDeflateScorer autoDetect() {
+        static FastDeflateScorer detected() {
+            FastDeflateScorer local = cached;
+            if (local != null) return local;
+            synchronized (FastDeflateScorer.class) {
+                if (cached == null) cached = autoDetect();
+                return cached;
+            }
+        }
+
+        private static FastDeflateScorer autoDetect() {
             List<FastDeflateScorer> options = List.of(
                     new FastDeflateScorer("pigz-1", List.of("pigz", "-1", "-c")),
                     new FastDeflateScorer("gzip-1", List.of("gzip", "-1", "-c")),
@@ -170,10 +181,16 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
         }
         private static int zlibLen(byte[] input) {
             Deflater d = new Deflater(1, true);
-            d.setInput(input); d.finish();
-            byte[] buf = new byte[input.length + 256];
-            int n = d.deflate(buf); d.end();
-            return n;
+            d.setInput(input);
+            d.finish();
+            byte[] buf = new byte[8192];
+            ByteArrayOutputStream compressed = new ByteArrayOutputStream(Math.max(1024, input.length / 2));
+            while (!d.finished()) {
+                int n = d.deflate(buf);
+                if (n > 0) compressed.write(buf, 0, n);
+            }
+            d.end();
+            return compressed.size();
         }
     }
 }
