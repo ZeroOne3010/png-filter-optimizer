@@ -114,8 +114,8 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
         int p = 0;
         for (FilteredRow row : rows) {
             out[p++] = (byte) row.filter().pngValue();
-            System.arraycopy(row.bytes(), 0, out, p, row.bytes().length);
-            p += row.bytes().length;
+            System.arraycopy(row.filteredBytes(), 0, out, p, row.filteredBytes().length);
+            p += row.filteredBytes().length;
         }
         return out;
     }
