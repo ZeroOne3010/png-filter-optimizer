@@ -65,29 +65,39 @@ public final class CliOptions {
         )
         public int beamWidth;
 
-        @Option(names = "--ga-blocks", defaultValue = "8", description = "Number of scanline blocks for the genetic optimizer.")
+        @Option(names = "--genetic-blocks", defaultValue = "16", description = "Number of scanline blocks for the genetic optimizer.")
         public int gaBlocks;
 
-        @Option(names = "--ga-population", defaultValue = "16", description = "Initial population size for the genetic optimizer.")
+        @Option(names = "--genetic-population", defaultValue = "64", description = "Initial population size for the genetic optimizer.")
         public int gaPopulation;
 
-        @Option(names = "--ga-survivors", defaultValue = "8", description = "Number of best genomes selected as parents.")
+        @Option(names = "--genetic-survivors", defaultValue = "8", description = "Number of best genomes selected as parents.")
         public int gaSurvivors;
 
-        @Option(names = "--ga-mutation-rate", defaultValue = "0.15", description = "Mutation probability in [0,1].")
+        @Option(names = "--genetic-mutation-rate", defaultValue = "0.15", description = "Mutation probability in [0,1].")
         public double gaMutationRate;
 
-        @Option(names = "--ga-runs", defaultValue = "1", description = "How many full GA runs to execute.")
-        public int gaRuns;
+        @Option(names = "--genetic-generations", defaultValue = "0", description = "Number of GA generations; use 0 for auto based on evaluation budget.")
+        public int gaGenerations;
 
-        @Option(names = "--ga-seed", defaultValue = "12345", description = "Deterministic random seed for GA.")
+        @Option(names = "--genetic-seed", defaultValue = "12345", description = "Deterministic random seed for GA.")
         public long gaSeed;
 
-        @Option(names = "--ga-time-limit-ms", defaultValue = "10000", description = "Time limit for GA optimization in milliseconds.")
-        public long gaTimeLimitMs;
+        @Option(names = "--genetic-evaluations", defaultValue = "256", description = "Maximum number of full-image fitness evaluations.")
+        public int gaEvaluations;
 
-        @Option(names = "--ga-initial-max-filters", defaultValue = "3", description = "Maximum number of distinct filters each initial GA candidate may use.")
+        @Option(names = "--genetic-initial-max-filters", defaultValue = "3", description = "Maximum number of distinct filters each initial GA candidate may use.")
         public int gaInitialMaxFilters;
+
+
+        @Option(names = "--genetic-elite-count", defaultValue = "4", description = "Number of elite genomes carried unchanged per generation.")
+        public int gaEliteCount;
+
+        @Option(names = "--genetic-prescreen", defaultValue = "true", description = "Enable cheap prescreening for child candidates.")
+        public boolean gaPrescreen;
+
+        @Option(names = "--genetic-prescreen-factor", defaultValue = "4", description = "Multiplier for child generation before prescreening.")
+        public int gaPrescreenFactor;
 
         @Option(names = "--optimizer-logs", description = "Print optimizer-specific insight/log lines when available.")
         public boolean optimizerLogs;
@@ -106,3 +116,4 @@ public final class CliOptions {
         FIXED_PAETH
     }
 }
+
