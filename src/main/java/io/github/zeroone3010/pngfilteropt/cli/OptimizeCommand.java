@@ -66,7 +66,7 @@ public final class OptimizeCommand implements Runnable {
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(),
                 CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
                 CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(optimizerSelection.beamWidth),
-                CliOptions.OptimizerName.GENETIC, new GeneticSplitOptimizer(optimizerSelection.gaBlocks, optimizerSelection.gaPopulation, optimizerSelection.gaSurvivors, optimizerSelection.gaMutationRate, optimizerSelection.gaRuns, optimizerSelection.gaSeed, java.time.Duration.ofMillis(optimizerSelection.gaTimeLimitMs)),
+                CliOptions.OptimizerName.GENETIC, new GeneticSplitOptimizer(optimizerSelection.gaBlocks, optimizerSelection.gaPopulation, optimizerSelection.gaSurvivors, optimizerSelection.gaMutationRate, optimizerSelection.gaRuns, optimizerSelection.gaSeed, java.time.Duration.ofMillis(optimizerSelection.gaTimeLimitMs), optimizerSelection.gaInitialMaxFilters),
                 CliOptions.OptimizerName.FIXED_NONE, new FixedFilterOptimizer(PngFilter.NONE),
                 CliOptions.OptimizerName.FIXED_SUB, new FixedFilterOptimizer(PngFilter.SUB),
                 CliOptions.OptimizerName.FIXED_UP, new FixedFilterOptimizer(PngFilter.UP),

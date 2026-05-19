@@ -86,6 +86,9 @@ public final class CliOptions {
         @Option(names = "--ga-time-limit-ms", defaultValue = "10000", description = "Time limit for GA optimization in milliseconds.")
         public long gaTimeLimitMs;
 
+        @Option(names = "--ga-initial-max-filters", defaultValue = "3", description = "Maximum number of distinct filters each initial GA candidate may use.")
+        public int gaInitialMaxFilters;
+
         @Option(names = "--optimizer-logs", description = "Print optimizer-specific insight/log lines when available.")
         public boolean optimizerLogs;
     }
