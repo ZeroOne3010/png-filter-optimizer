@@ -4,8 +4,14 @@ import io.github.zeroone3010.pngfilteropt.filter.CandidateGenerator;
 import io.github.zeroone3010.pngfilteropt.png.FilteredImage;
 import io.github.zeroone3010.pngfilteropt.png.RawImage;
 
+import java.util.Optional;
+
 public interface FilterOptimizer {
     String name();
 
     FilteredImage optimize(RawImage image, CandidateGenerator candidates);
+
+    default Optional<String> explainLastRun() {
+        return Optional.empty();
+    }
 }

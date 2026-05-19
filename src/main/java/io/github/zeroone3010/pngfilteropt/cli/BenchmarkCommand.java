@@ -9,7 +9,7 @@ import io.github.zeroone3010.pngfilteropt.optimize.EntropyOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FilterOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FixedFilterOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.LzBeamOptimizer;
-import io.github.zeroone3010.pngfilteropt.optimize.HierarchicalSplitOptimizer;
+import io.github.zeroone3010.pngfilteropt.optimize.GeneticSplitOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.SumAbsOptimizer;
 import io.github.zeroone3010.pngfilteropt.png.*;
 import io.github.zeroone3010.pngfilteropt.report.MarkdownDiagnosticsRenderer;
@@ -49,7 +49,7 @@ public final class BenchmarkCommand implements Runnable {
         var selected = optimizerSelection.tryAll ? List.of(CliOptions.OptimizerName.values()) : Arrays.asList(optimizerSelection.optimizers);
         var optimizers = Map.of(
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(), CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
-                CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(optimizerSelection.beamWidth), CliOptions.OptimizerName.HIERARCHICAL, new HierarchicalSplitOptimizer(optimizerSelection.hierMaxDepth, optimizerSelection.hierMinSegmentRows), CliOptions.OptimizerName.FIXED_NONE, new FixedFilterOptimizer(PngFilter.NONE),
+                CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(optimizerSelection.beamWidth), CliOptions.OptimizerName.GENETIC, new GeneticSplitOptimizer(optimizerSelection.gaBlocks, optimizerSelection.gaPopulation, optimizerSelection.gaSurvivors, optimizerSelection.gaMutationRate, optimizerSelection.gaRuns, optimizerSelection.gaSeed, java.time.Duration.ofMillis(optimizerSelection.gaTimeLimitMs)), CliOptions.OptimizerName.FIXED_NONE, new FixedFilterOptimizer(PngFilter.NONE),
                 CliOptions.OptimizerName.FIXED_SUB, new FixedFilterOptimizer(PngFilter.SUB), CliOptions.OptimizerName.FIXED_UP, new FixedFilterOptimizer(PngFilter.UP),
                 CliOptions.OptimizerName.FIXED_AVERAGE, new FixedFilterOptimizer(PngFilter.AVERAGE), CliOptions.OptimizerName.FIXED_PAETH, new FixedFilterOptimizer(PngFilter.PAETH));
 

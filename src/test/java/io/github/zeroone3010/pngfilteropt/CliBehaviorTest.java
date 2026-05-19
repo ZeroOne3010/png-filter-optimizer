@@ -46,13 +46,13 @@ class CliBehaviorTest {
 
 
     @Test
-    void optimizeSupportsHierarchicalOptimizer() throws Exception {
-        Path input = TestPngFixtures.createPng(Files.createTempFile("opt-hier", ".png"), 4, 4);
-        Path output = Files.createTempFile("opt-hier-out", ".png");
+    void optimizeSupportsGeneticOptimizer() throws Exception {
+        Path input = TestPngFixtures.createPng(Files.createTempFile("opt-ga", ".png"), 4, 4);
+        Path output = Files.createTempFile("opt-ga-out", ".png");
 
         int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
                 .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute("optimize", input.toString(), output.toString(), "--optimizer", "hierarchical", "--hier-max-depth", "4", "--hier-min-segment-rows", "1");
+                .execute("optimize", input.toString(), output.toString(), "--optimizer", "genetic", "--ga-seed", "7", "--ga-time-limit-ms", "1000");
 
         assertEquals(0, exit);
         assertTrue(Files.size(output) > 0);

@@ -6,7 +6,7 @@ import io.github.zeroone3010.pngfilteropt.optimize.EntropyOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FilterOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.FixedFilterOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.LzBeamOptimizer;
-import io.github.zeroone3010.pngfilteropt.optimize.HierarchicalSplitOptimizer;
+import io.github.zeroone3010.pngfilteropt.optimize.GeneticSplitOptimizer;
 import io.github.zeroone3010.pngfilteropt.optimize.SumAbsOptimizer;
 import io.github.zeroone3010.pngfilteropt.png.FilteredImage;
 import io.github.zeroone3010.pngfilteropt.png.FilterInspector;
@@ -66,7 +66,7 @@ public final class OptimizeCommand implements Runnable {
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(),
                 CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
                 CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(optimizerSelection.beamWidth),
-                CliOptions.OptimizerName.HIERARCHICAL, new HierarchicalSplitOptimizer(optimizerSelection.hierMaxDepth, optimizerSelection.hierMinSegmentRows),
+                CliOptions.OptimizerName.GENETIC, new GeneticSplitOptimizer(optimizerSelection.gaBlocks, optimizerSelection.gaPopulation, optimizerSelection.gaSurvivors, optimizerSelection.gaMutationRate, optimizerSelection.gaRuns, optimizerSelection.gaSeed, java.time.Duration.ofMillis(optimizerSelection.gaTimeLimitMs)),
                 CliOptions.OptimizerName.FIXED_NONE, new FixedFilterOptimizer(PngFilter.NONE),
                 CliOptions.OptimizerName.FIXED_SUB, new FixedFilterOptimizer(PngFilter.SUB),
                 CliOptions.OptimizerName.FIXED_UP, new FixedFilterOptimizer(PngFilter.UP),
@@ -97,6 +97,11 @@ public final class OptimizeCommand implements Runnable {
                 FilterOptimizer optimizer = optimizers.get(name);
                 candidate = optimizer.optimize(raw, candidates);
             }
+            if (optimizerSelection.optimizerLogs && name != CliOptions.OptimizerName.BASELINE) {
+                FilterOptimizer optimizer = optimizers.get(name);
+                optimizer.explainLastRun().ifPresent(msg -> spec.commandLine().getOut().printf("optimizer-log[%s]: %s%n", name.name().toLowerCase().replace('_','-'), msg.replace("\n", " | ")));
+            }
+
             encoder.encode(candidate, primaryOutput);
             long size;
             try {
