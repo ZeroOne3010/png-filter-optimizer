@@ -27,9 +27,10 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
     private final int runs;
     private final long seed;
     private final Duration timeLimit;
+    private final int initialMaxFiltersPerCandidate;
     private String lastRun;
 
-    public GeneticSplitOptimizer(int blocks, int population, int survivors, double mutationRate, int runs, long seed, Duration timeLimit) {
+    public GeneticSplitOptimizer(int blocks, int population, int survivors, double mutationRate, int runs, long seed, Duration timeLimit, int initialMaxFiltersPerCandidate) {
         this.blocks = Math.max(1, blocks);
         this.population = Math.max(2, population);
         this.survivors = Math.max(2, Math.min(survivors, population));
@@ -37,6 +38,7 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
         this.runs = Math.max(1, runs);
         this.seed = seed;
         this.timeLimit = timeLimit.isNegative() ? Duration.ZERO : timeLimit;
+        this.initialMaxFiltersPerCandidate = Math.max(1, Math.min(FILTERS.size(), initialMaxFiltersPerCandidate));
     }
 
     @Override public String name() { return "genetic"; }
@@ -52,7 +54,7 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
 
         Genome best = null;
         long bestScore = Long.MAX_VALUE;
-        StringBuilder log = new StringBuilder("optimizer=genetic blocks=" + blocks + " population=" + population + " runs=" + runs + " scorer=" + scorer.name + "\n");
+        StringBuilder log = new StringBuilder("optimizer=genetic blocks=" + blocks + " population=" + population + " initial_population=" + (population * 2) + " runs=" + runs + " initial_max_filters_per_candidate=" + initialMaxFiltersPerCandidate + " scorer=" + scorer.name + "\n");
 
         int iterations = 0;
         for (int run = 0; run < runs && System.nanoTime() < deadline; run++) {
@@ -88,10 +90,14 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
     }
 
     private List<Genome> randomPopulation(Random random) {
-        List<Genome> genomes = new ArrayList<>(population);
-        for (int i = 0; i < population; i++) {
+        int initialPopulation = population * 2;
+        List<Genome> genomes = new ArrayList<>(initialPopulation);
+        for (int i = 0; i < initialPopulation; i++) {
             PngFilter[] blockFilters = new PngFilter[blocks];
-            for (int b = 0; b < blocks; b++) blockFilters[b] = FILTERS.get(random.nextInt(FILTERS.size()));
+            List<PngFilter> shuffled = new ArrayList<>(FILTERS);
+            java.util.Collections.shuffle(shuffled, random);
+            List<PngFilter> allowed = shuffled.subList(0, Math.min(initialMaxFiltersPerCandidate, shuffled.size()));
+            for (int b = 0; b < blocks; b++) blockFilters[b] = allowed.get(random.nextInt(allowed.size()));
             genomes.add(new Genome(blockFilters));
         }
         return genomes;
