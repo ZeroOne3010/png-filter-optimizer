@@ -121,22 +121,21 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
         var scorer = FastDeflateScorer.detected();
         List<List<FilteredRow>> rowCandidates = new ArrayList<>(image.height());
         for (int y = 0; y < image.height(); y++) rowCandidates.add(candidates.generateCandidates(image, y));
-        int effectiveBlocks = Math.min(blocks, Math.max(1, image.height()));
         FitnessCache cache = new FitnessCache();
 
         Map<PngFilter, ScoredGenome> fixedScores = new LinkedHashMap<>();
         for (PngFilter f : FILTERS) {
-            Genome g = fillGenome(f, effectiveBlocks);
+            Genome g = fillGenome(f);
             fixedScores.put(f, score(g, image, rowCandidates, scorer, cache));
         }
         ScoredGenome best = fixedScores.values().stream().filter(Objects::nonNull).min(Comparator.comparingLong(ScoredGenome::score)).orElseThrow();
         PngFilter bestFixed = best.genome.blockFilters[0];
 
         List<NamedSeed> seeds = new ArrayList<>();
-        seeds.add(new NamedSeed("entropy", fromRows(image, rowCandidates, y -> rowCandidates.get(y).stream().min(Comparator.comparingLong(r -> entropyish(r.filteredBytes()))).orElse(rowCandidates.get(y).get(0)).filter(), effectiveBlocks)));
-        seeds.add(new NamedSeed("adaptive", fromRows(image, rowCandidates, y -> rowCandidates.get(y).stream().min(Comparator.comparingLong(r -> sumAbs(r.filteredBytes()))).orElse(rowCandidates.get(y).get(0)).filter(), effectiveBlocks)));
-        seeds.add(new NamedSeed("baseline", fromRows(image, rowCandidates, y -> rowCandidates.get(y).get(0).filter(), effectiveBlocks)));
-        List<RegionCandidate> regions = findDisagreementRegions(bestFixed, seeds, effectiveBlocks);
+        seeds.add(new NamedSeed("entropy", fromRows(image, rowCandidates, y -> rowCandidates.get(y).stream().min(Comparator.comparingLong(r -> entropyish(r.filteredBytes()))).orElse(rowCandidates.get(y).get(0)).filter())));
+        seeds.add(new NamedSeed("adaptive", fromRows(image, rowCandidates, y -> rowCandidates.get(y).stream().min(Comparator.comparingLong(r -> sumAbs(r.filteredBytes()))).orElse(rowCandidates.get(y).get(0)).filter())));
+        seeds.add(new NamedSeed("baseline", fromRows(image, rowCandidates, y -> rowCandidates.get(y).get(0).filter())));
+        List<RegionCandidate> regions = findDisagreementRegions(bestFixed, seeds, blocks);
 
         List<RegionScore> improvedSingles = new ArrayList<>();
         List<RegionCandidate> accepted = new ArrayList<>();

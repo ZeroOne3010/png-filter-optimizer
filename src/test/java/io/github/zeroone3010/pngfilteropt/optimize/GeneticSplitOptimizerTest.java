@@ -77,4 +77,13 @@ class GeneticSplitOptimizerTest {
         assertTrue(log.contains("evaluated candidates:"));
         assertTrue(log.contains("/ 24"));
     }
+
+    @Test
+    void exceptionModeWorksWhenHeightIsSmallerThanBlockCount() throws Exception {
+        var png = TestPngFixtures.createPng(Files.createTempFile("hier-exc-small", ".png"), 6, 4);
+        var raw = new PngDecoder().decode(png);
+        var optimizer = new GeneticSplitOptimizer(16, 24, 16, 8, 2, 2, 0.15, 123L, 3, true, 4, GeneticSplitOptimizer.GeneticMode.EXCEPTIONS, 2, 1, 64);
+        var out = optimizer.optimize(raw, new CandidateGenerator());
+        assertEquals(raw.height(), out.rows().size());
+    }
 }
