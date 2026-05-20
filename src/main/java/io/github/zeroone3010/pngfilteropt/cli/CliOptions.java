@@ -98,6 +98,14 @@ public final class CliOptions {
 
         @Option(names = "--genetic-prescreen-factor", defaultValue = "4", description = "Multiplier for child generation before prescreening.")
         public int gaPrescreenFactor;
+        @Option(names = "--genetic-mode", defaultValue = "standard", description = "Genetic mode: standard or exceptions.")
+        public String gaMode;
+        @Option(names = "--exception-min-run", defaultValue = "2", description = "Minimum disagreement run length (in blocks) for exception-search.")
+        public int exceptionMinRun;
+        @Option(names = "--exception-merge-gap", defaultValue = "1", description = "Merge adjacent disagreement regions separated by at most this many blocks.")
+        public int exceptionMergeGap;
+        @Option(names = "--exception-max-regions", defaultValue = "64", description = "Maximum disagreement regions evaluated in exception-search.")
+        public int exceptionMaxRegions;
 
         @Option(names = "--optimizer-logs", description = "Print optimizer-specific insight/log lines when available.")
         public boolean optimizerLogs;
@@ -116,4 +124,3 @@ public final class CliOptions {
         FIXED_PAETH
     }
 }
-

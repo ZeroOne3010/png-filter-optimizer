@@ -14,6 +14,7 @@ import java.util.*;
 import java.util.zip.Deflater;
 
 public final class GeneticSplitOptimizer implements FilterOptimizer {
+    public enum GeneticMode { STANDARD, EXCEPTIONS }
     private static final List<PngFilter> FILTERS = List.of(PngFilter.NONE, PngFilter.SUB, PngFilter.UP, PngFilter.AVERAGE, PngFilter.PAETH);
     private final int blocks;
     private final int evaluationsBudget;
@@ -26,9 +27,17 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
     private final int initialMaxFiltersPerCandidate;
     private final boolean prescreen;
     private final int prescreenFactor;
+    private final GeneticMode mode;
+    private final int exceptionMinRun;
+    private final int exceptionMergeGap;
+    private final int exceptionMaxRegions;
     private String lastRun;
 
     public GeneticSplitOptimizer(int blocks, int evaluationsBudget, int population, int survivors, int eliteCount, int generations, double mutationRate, long seed, int initialMaxFiltersPerCandidate, boolean prescreen, int prescreenFactor) {
+        this(blocks, evaluationsBudget, population, survivors, eliteCount, generations, mutationRate, seed, initialMaxFiltersPerCandidate, prescreen, prescreenFactor, GeneticMode.STANDARD, 2, 1, 64);
+    }
+
+    public GeneticSplitOptimizer(int blocks, int evaluationsBudget, int population, int survivors, int eliteCount, int generations, double mutationRate, long seed, int initialMaxFiltersPerCandidate, boolean prescreen, int prescreenFactor, GeneticMode mode, int exceptionMinRun, int exceptionMergeGap, int exceptionMaxRegions) {
         this.blocks = Math.max(1, blocks);
         this.evaluationsBudget = Math.max(1, evaluationsBudget);
         this.population = Math.max(2, population);
@@ -40,6 +49,10 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
         this.initialMaxFiltersPerCandidate = Math.max(1, Math.min(FILTERS.size(), initialMaxFiltersPerCandidate));
         this.prescreen = prescreen;
         this.prescreenFactor = Math.max(1, prescreenFactor);
+        this.mode = mode == null ? GeneticMode.STANDARD : mode;
+        this.exceptionMinRun = Math.max(1, exceptionMinRun);
+        this.exceptionMergeGap = Math.max(0, exceptionMergeGap);
+        this.exceptionMaxRegions = Math.max(1, exceptionMaxRegions);
     }
 
     @Override public String name() { return "genetic"; }
@@ -47,6 +60,7 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
 
     @Override
     public FilteredImage optimize(RawImage image, CandidateGenerator candidates) {
+        if (mode == GeneticMode.EXCEPTIONS) return optimizeExceptions(image, candidates);
         Random random = new Random(seed);
         var scorer = FastDeflateScorer.detected();
         List<List<FilteredRow>> rowCandidates = new ArrayList<>(image.height());
@@ -101,6 +115,53 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
         Genome winner = best == null ? randomGenome(random) : best.genome;
         lastRun = buildLog(scorer.name, genCount, bestByGeneration, winner, fitnessCache);
         return new FilteredImage(image, materializeRows(image, rowCandidates, winner));
+    }
+
+    private FilteredImage optimizeExceptions(RawImage image, CandidateGenerator candidates) {
+        var scorer = FastDeflateScorer.detected();
+        List<List<FilteredRow>> rowCandidates = new ArrayList<>(image.height());
+        for (int y = 0; y < image.height(); y++) rowCandidates.add(candidates.generateCandidates(image, y));
+        int effectiveBlocks = Math.min(blocks, Math.max(1, image.height()));
+        FitnessCache cache = new FitnessCache();
+
+        Map<PngFilter, ScoredGenome> fixedScores = new LinkedHashMap<>();
+        for (PngFilter f : FILTERS) {
+            Genome g = fillGenome(f, effectiveBlocks);
+            fixedScores.put(f, score(g, image, rowCandidates, scorer, cache));
+        }
+        ScoredGenome best = fixedScores.values().stream().filter(Objects::nonNull).min(Comparator.comparingLong(ScoredGenome::score)).orElseThrow();
+        PngFilter bestFixed = best.genome.blockFilters[0];
+
+        List<NamedSeed> seeds = new ArrayList<>();
+        seeds.add(new NamedSeed("entropy", fromRows(image, rowCandidates, y -> rowCandidates.get(y).stream().min(Comparator.comparingLong(r -> entropyish(r.filteredBytes()))).orElse(rowCandidates.get(y).get(0)).filter(), effectiveBlocks)));
+        seeds.add(new NamedSeed("adaptive", fromRows(image, rowCandidates, y -> rowCandidates.get(y).stream().min(Comparator.comparingLong(r -> sumAbs(r.filteredBytes()))).orElse(rowCandidates.get(y).get(0)).filter(), effectiveBlocks)));
+        seeds.add(new NamedSeed("baseline", fromRows(image, rowCandidates, y -> rowCandidates.get(y).get(0).filter(), effectiveBlocks)));
+        List<RegionCandidate> regions = findDisagreementRegions(bestFixed, seeds, effectiveBlocks);
+
+        List<RegionScore> improvedSingles = new ArrayList<>();
+        List<RegionCandidate> accepted = new ArrayList<>();
+        for (RegionCandidate region : regions) {
+            ScoredGenome candidate = score(applyRegion(best.genome, region), image, rowCandidates, scorer, cache);
+            if (candidate != null && candidate.score < best.score) {
+                improvedSingles.add(new RegionScore(region, best.score - candidate.score));
+                best = candidate;
+                accepted.add(region);
+            }
+            if (cache.evaluations >= evaluationsBudget) break;
+        }
+        improvedSingles.sort(Comparator.comparingLong(RegionScore::gain).reversed());
+        for (RegionScore regionScore : improvedSingles) {
+            if (cache.evaluations >= evaluationsBudget) break;
+            ScoredGenome candidate = score(applyRegion(best.genome, regionScore.region), image, rowCandidates, scorer, cache);
+            if (candidate != null && candidate.score < best.score) {
+                best = candidate;
+                accepted.add(regionScore.region);
+            }
+        }
+
+        long bestFixedScore = fixedScores.get(bestFixed).score;
+        lastRun = buildExceptionLog(scorer.name, bestFixed, bestFixedScore, best.score, cache, seeds, regions, accepted, best.genome);
+        return new FilteredImage(image, materializeRows(image, rowCandidates, best.genome));
     }
 
     private int autoGenerations() {
@@ -189,13 +250,15 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
     private long entropyish(byte[] data) { long sum = 0; int[] hist = new int[256]; for (byte b: data) hist[b & 255]++; for (int h: hist) sum += (long) h * h; return sum; }
     private long sumAbs(byte[] data) { long sum = 0; for (byte b : data) sum += Math.abs((int)b); return sum; }
 
-    private Genome fillGenome(PngFilter filter) { PngFilter[] gf = new PngFilter[blocks]; Arrays.fill(gf, filter); return new Genome(gf); }
+    private Genome fillGenome(PngFilter filter) { return fillGenome(filter, blocks); }
+    private Genome fillGenome(PngFilter filter, int blockCount) { PngFilter[] gf = new PngFilter[blockCount]; Arrays.fill(gf, filter); return new Genome(gf); }
 
-    private Genome fromRows(RawImage image, List<List<FilteredRow>> perRow, java.util.function.IntFunction<PngFilter> fn) {
-        PngFilter[] gf = new PngFilter[blocks];
-        for (int b = 0; b < blocks; b++) gf[b] = PngFilter.NONE;
+    private Genome fromRows(RawImage image, List<List<FilteredRow>> perRow, java.util.function.IntFunction<PngFilter> fn) { return fromRows(image, perRow, fn, blocks); }
+    private Genome fromRows(RawImage image, List<List<FilteredRow>> perRow, java.util.function.IntFunction<PngFilter> fn, int blockCount) {
+        PngFilter[] gf = new PngFilter[blockCount];
+        for (int b = 0; b < blockCount; b++) gf[b] = PngFilter.NONE;
         for (int y = 0; y < image.height(); y++) {
-            int block = Math.min(blocks - 1, (y * blocks) / Math.max(1, image.height()));
+            int block = Math.min(blockCount - 1, (y * blockCount) / Math.max(1, image.height()));
             gf[block] = fn.apply(y);
         }
         return new Genome(gf);
@@ -248,7 +311,67 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
         return b.toString();
     }
 
+    static List<Region> mergeRegions(List<Region> regions, int minRun, int mergeGap, int maxRegions) {
+        List<Region> ordered = new ArrayList<>(regions.stream().filter(r -> (r.end - r.start + 1) >= minRun).sorted(Comparator.comparingInt(r -> r.start)).toList());
+        if (ordered.isEmpty()) return List.of();
+        List<Region> merged = new ArrayList<>();
+        Region current = ordered.get(0);
+        for (int i = 1; i < ordered.size(); i++) {
+            Region next = ordered.get(i);
+            if (next.start - current.end - 1 <= mergeGap) current = new Region(current.start, Math.max(current.end, next.end));
+            else {
+                merged.add(current);
+                current = next;
+            }
+        }
+        merged.add(current);
+        return merged.size() > maxRegions ? merged.subList(0, maxRegions) : merged;
+    }
+
+    private List<RegionCandidate> findDisagreementRegions(PngFilter bestFixed, List<NamedSeed> seeds, int blockCount) {
+        List<RegionCandidate> out = new ArrayList<>();
+        for (NamedSeed seedSeq : seeds) {
+            List<RegionCandidate> raw = new ArrayList<>();
+            int start = -1;
+            for (int b = 0; b < blockCount; b++) {
+                if (seedSeq.genome.blockFilters[b] != bestFixed) {
+                    if (start < 0) start = b;
+                } else if (start >= 0) {
+                    raw.add(new RegionCandidate(seedSeq.name, new Region(start, b - 1), seedSeq.genome.blockFilters[start]));
+                    start = -1;
+                }
+            }
+            if (start >= 0) raw.add(new RegionCandidate(seedSeq.name, new Region(start, blockCount - 1), seedSeq.genome.blockFilters[start]));
+            List<Region> merged = mergeRegions(raw.stream().map(r -> r.region).toList(), exceptionMinRun, exceptionMergeGap, exceptionMaxRegions);
+            for (Region mr : merged) out.add(new RegionCandidate(seedSeq.name, mr, seedSeq.genome.blockFilters[mr.start]));
+        }
+        return out.stream().limit(exceptionMaxRegions).toList();
+    }
+
+    private Genome applyRegion(Genome base, RegionCandidate region) {
+        PngFilter[] c = Arrays.copyOf(base.blockFilters, base.blockFilters.length);
+        for (int i = region.region.start; i <= region.region.end && i < c.length; i++) c[i] = region.filter;
+        return new Genome(c);
+    }
+
+    private String buildExceptionLog(String scorerName, PngFilter bestFixed, long bestFixedScore, long finalScore, FitnessCache cache, List<NamedSeed> seeds, List<RegionCandidate> regions, List<RegionCandidate> accepted, Genome winner) {
+        return "Exception search:\n" +
+                "- scorer: " + scorerName + " (fast-deflate estimated fitness)\n" +
+                "- best fixed filter: " + bestFixed + "\n" +
+                "- evaluated candidates: " + cache.evaluations + " / " + evaluationsBudget + "\n" +
+                "- cache hits: " + cache.cacheHits + "\n" +
+                "- seed sequences used: " + String.join(", ", seeds.stream().map(NamedSeed::name).toList()) + "\n" +
+                "- disagreement regions found: " + regions.size() + "\n" +
+                "- accepted exception regions: " + accepted.size() + "\n" +
+                "- improvement over best fixed filter: " + (bestFixedScore - finalScore) + "\n" +
+                "- final genome: " + winner.code();
+    }
+
     private static final class FitnessCache { final Map<String, Long> map = new HashMap<>(); int evaluations; int cacheHits; }
+    record Region(int start, int end) {}
+    private record NamedSeed(String name, Genome genome) {}
+    private record RegionCandidate(String seedName, Region region, PngFilter filter) {}
+    private record RegionScore(RegionCandidate region, long gain) {}
 
     private record Genome(PngFilter[] blockFilters) {
         Genome mutate(Random random, double mutationRate) { if (random.nextDouble() >= mutationRate) return this; return flipOne(random); }
