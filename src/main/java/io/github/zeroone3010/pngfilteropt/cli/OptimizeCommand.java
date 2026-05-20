@@ -66,7 +66,7 @@ public final class OptimizeCommand implements Runnable {
                 CliOptions.OptimizerName.ENTROPY, new EntropyOptimizer(),
                 CliOptions.OptimizerName.ADAPTIVE, new SumAbsOptimizer(),
                 CliOptions.OptimizerName.EXHAUSTIVE, new LzBeamOptimizer(optimizerSelection.beamWidth),
-                CliOptions.OptimizerName.GENETIC, new GeneticSplitOptimizer(optimizerSelection.gaBlocks, optimizerSelection.gaEvaluations, optimizerSelection.gaPopulation, optimizerSelection.gaSurvivors, optimizerSelection.gaEliteCount, optimizerSelection.gaGenerations, optimizerSelection.gaMutationRate, optimizerSelection.gaSeed, optimizerSelection.gaInitialMaxFilters, optimizerSelection.gaPrescreen, optimizerSelection.gaPrescreenFactor),
+                CliOptions.OptimizerName.GENETIC, new GeneticSplitOptimizer(optimizerSelection.gaBlocks, optimizerSelection.gaEvaluations, optimizerSelection.gaPopulation, optimizerSelection.gaSurvivors, optimizerSelection.gaEliteCount, optimizerSelection.gaGenerations, optimizerSelection.gaMutationRate, optimizerSelection.gaSeed, optimizerSelection.gaInitialMaxFilters, optimizerSelection.gaPrescreen, optimizerSelection.gaPrescreenFactor, "exceptions".equalsIgnoreCase(optimizerSelection.gaMode) ? GeneticSplitOptimizer.GeneticMode.EXCEPTIONS : GeneticSplitOptimizer.GeneticMode.STANDARD, optimizerSelection.exceptionMinRun, optimizerSelection.exceptionMergeGap, optimizerSelection.exceptionMaxRegions),
                 CliOptions.OptimizerName.FIXED_NONE, new FixedFilterOptimizer(PngFilter.NONE),
                 CliOptions.OptimizerName.FIXED_SUB, new FixedFilterOptimizer(PngFilter.SUB),
                 CliOptions.OptimizerName.FIXED_UP, new FixedFilterOptimizer(PngFilter.UP),
