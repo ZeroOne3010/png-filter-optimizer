@@ -65,28 +65,28 @@ public final class CliOptions {
         )
         public int beamWidth;
 
-        @Option(names = "--genetic-blocks", defaultValue = "16", description = "Number of scanline blocks for the genetic optimizer.")
+        @Option(names = {"--genetic-blocks", "--ga-blocks"}, defaultValue = "16", description = "Number of scanline blocks for the genetic optimizer.")
         public int gaBlocks;
 
-        @Option(names = "--genetic-population", defaultValue = "64", description = "Initial population size for the genetic optimizer.")
+        @Option(names = {"--genetic-population", "--ga-population"}, defaultValue = "64", description = "Initial population size for the genetic optimizer.")
         public int gaPopulation;
 
-        @Option(names = "--genetic-survivors", defaultValue = "8", description = "Number of best genomes selected as parents.")
+        @Option(names = {"--genetic-survivors", "--ga-survivors"}, defaultValue = "8", description = "Number of best genomes selected as parents.")
         public int gaSurvivors;
 
-        @Option(names = "--genetic-mutation-rate", defaultValue = "0.15", description = "Mutation probability in [0,1].")
+        @Option(names = {"--genetic-mutation-rate", "--ga-mutation-rate"}, defaultValue = "0.15", description = "Mutation probability in [0,1].")
         public double gaMutationRate;
 
-        @Option(names = "--genetic-generations", defaultValue = "0", description = "Number of GA generations; use 0 for auto based on evaluation budget.")
+        @Option(names = {"--genetic-generations", "--ga-runs"}, defaultValue = "0", description = "Number of GA generations; use 0 for auto based on evaluation budget.")
         public int gaGenerations;
 
-        @Option(names = "--genetic-seed", defaultValue = "12345", description = "Deterministic random seed for GA.")
+        @Option(names = {"--genetic-seed", "--ga-seed"}, defaultValue = "12345", description = "Deterministic random seed for GA.")
         public long gaSeed;
 
-        @Option(names = "--genetic-evaluations", defaultValue = "256", description = "Maximum number of full-image fitness evaluations.")
+        @Option(names = {"--genetic-evaluations", "--ga-time-limit-ms"}, defaultValue = "256", description = "Maximum number of full-image fitness evaluations.")
         public int gaEvaluations;
 
-        @Option(names = "--genetic-initial-max-filters", defaultValue = "3", description = "Maximum number of distinct filters each initial GA candidate may use.")
+        @Option(names = {"--genetic-initial-max-filters", "--ga-initial-max-filters"}, defaultValue = "3", description = "Maximum number of distinct filters each initial GA candidate may use.")
         public int gaInitialMaxFilters;
 
 

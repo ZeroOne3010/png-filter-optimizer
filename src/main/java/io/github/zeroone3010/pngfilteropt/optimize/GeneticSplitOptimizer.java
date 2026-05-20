@@ -119,7 +119,7 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
                     PngFilter[] next = Arrays.copyOf(best.genome.blockFilters, blocks);
                     next[b] = f;
                     ScoredGenome candidate = score(new Genome(next), image, rowCandidates, scorer, cache);
-                    if (candidate.score <= best.score) {
+                    if (candidate.score < best.score) {
                         best = candidate;
                         improved = true;
                     }
