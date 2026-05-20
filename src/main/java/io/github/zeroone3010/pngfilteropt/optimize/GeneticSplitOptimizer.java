@@ -310,7 +310,7 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
         return b.toString();
     }
 
-    static List<Region> mergeRegions(List<Region> regions, int minRun, int mergeGap, int maxRegions) {
+    public static List<Region> mergeRegions(List<Region> regions, int minRun, int mergeGap, int maxRegions) {
         List<Region> ordered = new ArrayList<>(regions.stream().filter(r -> (r.end - r.start + 1) >= minRun).sorted(Comparator.comparingInt(r -> r.start)).toList());
         if (ordered.isEmpty()) return List.of();
         List<Region> merged = new ArrayList<>();
@@ -367,7 +367,7 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
     }
 
     private static final class FitnessCache { final Map<String, Long> map = new HashMap<>(); int evaluations; int cacheHits; }
-    record Region(int start, int end) {}
+    public record Region(int start, int end) {}
     private record NamedSeed(String name, Genome genome) {}
     private record RegionCandidate(String seedName, Region region, PngFilter filter) {}
     private record RegionScore(RegionCandidate region, long gain) {}
