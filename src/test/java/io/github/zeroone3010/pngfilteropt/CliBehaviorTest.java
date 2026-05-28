@@ -198,9 +198,43 @@ class CliBehaviorTest {
         assertTrue(mdText.contains("Filter distribution"));
         assertTrue(mdText.contains("## Directional smoothness"));
         assertTrue(mdText.contains("## Residual sumAbs"));
+        assertTrue(mdText.contains("Likely explanation:"));
+        assertTrue(mdText.contains("Compression insight:"));
         assertTrue(mdText.contains("approximate LZ longest-match estimation"));
         var json = new ObjectMapper().readTree(jsonText);
         assertTrue(json.get("images").get(0).has("diagnostics"));
+    }
+
+    @Test
+    void benchmarkInsightsAddsConciseInsightSectionWithoutDiagnosticsTables() throws Exception {
+        Path root = Files.createTempDirectory("png-bench-insights");
+        TestPngFixtures.createPng(root.resolve("one.png"), 2, 2);
+        Path md = Files.createTempFile("bench-insights", ".md");
+
+        int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .execute("benchmark", root.toString(), "--try-all", "--insights", "--markdown", md.toString());
+
+        assertEquals(0, exit);
+        String mdText = Files.readString(md);
+        assertTrue(mdText.contains("## Compression insights"));
+        assertTrue(mdText.contains("Compression insight:"));
+        assertFalse(mdText.contains("## Diagnostics"));
+        assertFalse(mdText.contains("Filter distribution"));
+    }
+
+    @Test
+    void benchmarkInsightsVerboseIncludesDetectedPatterns() throws Exception {
+        Path root = Files.createTempDirectory("png-bench-insights-verbose");
+        TestPngFixtures.createPng(root.resolve("one.png"), 2, 2);
+        Path md = Files.createTempFile("bench-insights-verbose", ".md");
+
+        int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .execute("benchmark", root.toString(), "--try-all", "--insights-verbose", "--markdown", md.toString());
+
+        assertEquals(0, exit);
+        String mdText = Files.readString(md);
+        assertTrue(mdText.contains("## Compression insights"));
+        assertTrue(mdText.contains("Patterns detected:"));
     }
 
 }
