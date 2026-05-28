@@ -43,6 +43,9 @@ public final class BenchmarkCommand implements Runnable {
     @Option(names = "--benchmark-controls", description = "Enable control/reference benchmark variants.") boolean benchmarkControls = true;
     @Option(names = "--benchmark-zopfli-original", description = "Include zopfli runs against original PNGs.") boolean benchmarkZopfliOriginal = true;
     @Option(names = "--benchmark-preserve-original-filters", description = "Include zopfli preserve-filters control runs.") boolean benchmarkPreserveOriginalFilters = true;
+    @Option(names = "--filter-visualizations", negatable = true, description = "Write small palettized PNG previews that tint each row by its selected PNG filter.") boolean filterVisualizations = true;
+    @Option(names = "--filter-visualization-max-side", defaultValue = "256", description = "Maximum width or height for filter visualization PNGs.") int filterVisualizationMaxSide = FilterVisualizationWriter.DEFAULT_MAX_SIDE;
+    @Option(names = "--filter-visualization-inline", negatable = true, description = "Embed filter visualization PNGs as data URIs in markdown, useful for GitHub step summaries.") boolean filterVisualizationInline = false;
 
     @Override public void run() {
         var decoder = new PngDecoder(); var encoder = new PngEncoder(); var inspector = new FilterInspector(); var candidates = new CandidateGenerator();
@@ -78,7 +81,8 @@ public final class BenchmarkCommand implements Runnable {
             strategies.put("original", fileSize(png));
             timingsMs.put("original", 0L);
 
-            FilteredImage rewrittenBaseline = buildBaseline(raw, inspector.listFilters(png, raw), candidates);
+            List<PngFilter> originalFilters = inspector.listFilters(png, raw);
+            FilteredImage rewrittenBaseline = buildBaseline(raw, originalFilters, candidates);
             long rewrittenBaselineSize = estimateDeflatedSize(rewrittenBaseline);
             strategies.put("rewritten-baseline", rewrittenBaselineSize);
             timingsMs.put("rewritten-baseline", 0L);
@@ -102,12 +106,16 @@ public final class BenchmarkCommand implements Runnable {
             }
 
             Map<String, Object> strategyDiagnostics = new LinkedHashMap<>();
+            Map<String, FilterLayout> filterLayouts = new LinkedHashMap<>();
+            filterLayouts.put("original", FilterLayout.fromRows(originalFilters));
+            filterLayouts.put("rewritten-baseline", FilterLayout.fromRows(filtersOf(rewrittenBaseline)));
             for (CliOptions.OptimizerName name : selected) {
                 String key = name.name().toLowerCase().replace('_', '-');
                 long t0 = System.nanoTime();
                 FilteredImage optimized = name == CliOptions.OptimizerName.BASELINE ? rewrittenBaseline : optimizers.get(name).optimize(raw, candidates);
                 timingsMs.put(key, nanosToMillis(System.nanoTime() - t0));
                 strategies.put(key, estimateDeflatedSize(optimized));
+                filterLayouts.put(key, FilterLayout.fromRows(filtersOf(optimized)));
                 if (diagnostics) strategyDiagnostics.put(key, diagnosticsCalculator.calculate(optimized));
             }
 
@@ -118,9 +126,16 @@ public final class BenchmarkCommand implements Runnable {
                 strategies.put("delta-zopfli-default-vs-preserve", strategies.get("zopflipng-default-original") - strategies.get("zopflipng-preserve-original-filters"));
             }
 
+            Map<String, Object> filterLayoutJson = toFilterLayoutJson(filterLayouts);
+            Map<String, Map<String, Object>> visualizationJson = filterVisualizations
+                    ? writeFilterVisualizations(png, imageLabel(png), filterLayouts, shouldInlineVisualizations(), visualizationOutputDirectory())
+                    : new LinkedHashMap<>();
+
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("image", imageLabel(png)); row.put("strategies", strategies); row.put("timings_ms", timingsMs); row.put("best", bestKey(strategies, timingsMs));
             row.put("metadata", Map.of("original_color_type", raw.colorType(), "rewritten_color_type", raw.colorType(), "original_bit_depth", raw.bitDepth(), "rewritten_bit_depth", raw.bitDepth(), "palette_preserved", raw.paletteRgb() != null, "interlace_preserved", raw.interlaceMethod() == 0 || raw.interlaceMethod() == 1));
+            row.put("filter_layouts", filterLayoutJson);
+            if (!visualizationJson.isEmpty()) row.put("filter_visualizations", visualizationJson);
             if (diagnostics) row.put("diagnostics", strategyDiagnostics);
             images.add(row);
         }
@@ -165,6 +180,69 @@ public final class BenchmarkCommand implements Runnable {
         return sizes.entrySet().stream()
                 .anyMatch(e -> e.getKey().startsWith("fixed-") && Objects.equals(e.getValue(), geneticSize));
     }
+    private boolean shouldInlineVisualizations() {
+        if (filterVisualizationInline) return true;
+        String githubStepSummary = System.getenv("GITHUB_STEP_SUMMARY");
+        return markdownOutput != null && githubStepSummary != null && markdownOutput.toAbsolutePath().normalize().equals(Path.of(githubStepSummary).toAbsolutePath().normalize());
+    }
+
+    private Path visualizationOutputDirectory() {
+        Path base = markdownOutput != null && markdownOutput.getParent() != null
+                ? markdownOutput.getParent()
+                : Path.of("build", "reports", "pngfilteropt");
+        return base.resolve("filter-visualizations");
+    }
+
+    private Map<String, Map<String, Object>> writeFilterVisualizations(Path png, String imageLabel, Map<String, FilterLayout> layouts, boolean inline, Path outputDir) {
+        Map<String, Map<String, Object>> visualizations = new LinkedHashMap<>();
+        var writer = new FilterVisualizationWriter(filterVisualizationMaxSide);
+        for (var e : layouts.entrySet()) {
+            if (e.getValue().isTrivial()) continue;
+            String fileName = sanitizeFileName(imageLabel) + "--" + sanitizeFileName(e.getKey()) + ".filters.png";
+            FilterVisualizationWriter.Visualization visualization = writer.write(png, e.getValue(), outputDir.resolve(fileName));
+            Map<String, Object> json = new LinkedHashMap<>();
+            json.put("path", visualization.path().toString());
+            json.put("markdown_src", markdownVisualizationSource(visualization.path()));
+            json.put("bytes", visualization.bytes());
+            if (inline) json.put("data_uri", visualization.dataUri());
+            visualizations.put(e.getKey(), json);
+        }
+        return visualizations;
+    }
+
+    private String markdownVisualizationSource(Path visualizationPath) {
+        if (markdownOutput == null || markdownOutput.getParent() == null) return visualizationPath.toString();
+        return markdownOutput.getParent().toAbsolutePath().normalize().relativize(visualizationPath.toAbsolutePath().normalize()).toString();
+    }
+
+    private static Map<String, Object> toFilterLayoutJson(Map<String, FilterLayout> layouts) {
+        Map<String, Object> json = new LinkedHashMap<>();
+        for (var e : layouts.entrySet()) {
+            FilterLayout layout = e.getValue();
+            Map<String, Object> value = new LinkedHashMap<>();
+            value.put("row_count", layout.rowCount());
+            value.put("filter_counts", layout.counts());
+            value.put("row_filters", layout.rowFilters().stream().map(Enum::name).toList());
+            value.put("runs", layout.runs().stream().map(run -> Map.of(
+                    "start_row", run.startRow(),
+                    "end_row", run.endRowInclusive(),
+                    "row_count", run.rowCount(),
+                    "filter", run.filter().name()
+            )).toList());
+            json.put(e.getKey(), value);
+        }
+        return json;
+    }
+
+    private static List<PngFilter> filtersOf(FilteredImage image) {
+        return image.rows().stream().map(FilteredRow::filter).toList();
+    }
+
+    private static String sanitizeFileName(String value) {
+        String sanitized = value.replaceAll("[^A-Za-z0-9._-]+", "-").replaceAll("^-+|-+$", "");
+        return sanitized.isBlank() ? "image" : sanitized;
+    }
+
     private String imageLabel(Path png) {
         try {
             return directory.relativize(png).toString();
@@ -242,10 +320,38 @@ public final class BenchmarkCommand implements Runnable {
                 for (var e : t.entrySet()) sb.append("- ").append(e.getKey()).append(": ").append(e.getValue()).append(" ms\n");
                 sb.append("\n");
             }
+            @SuppressWarnings("unchecked") Map<String, Map<String, Object>> visualizations=(Map<String, Map<String, Object>>)image.get("filter_visualizations");
+            if(visualizations!=null && !visualizations.isEmpty()){
+                sb.append("Filter layout previews (row tint: NONE red, SUB orange, UP blue, AVERAGE green, PAETH purple):\n\n");
+                for (var e : visualizations.entrySet()) {
+                    Object src = e.getValue().containsKey("data_uri") ? e.getValue().get("data_uri") : e.getValue().getOrDefault("markdown_src", e.getValue().get("path"));
+                    sb.append("**").append(e.getKey()).append("**\n\n");
+                    sb.append("![](").append(src).append(")\n\n");
+                }
+            }
         }
         return sb.toString();
     }
 
-    private static String renderJson(List<Map<String, Object>> images){ try { return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("images",images))+"\n"; } catch (JsonProcessingException e) { throw new IllegalStateException(e); } }
+    private static String renderJson(List<Map<String, Object>> images){ try { return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("images", jsonImages(images)))+"\n"; } catch (JsonProcessingException e) { throw new IllegalStateException(e); } }
+
+    private static List<Map<String, Object>> jsonImages(List<Map<String, Object>> images) {
+        List<Map<String, Object>> copy = new ArrayList<>();
+        for (Map<String, Object> image : images) {
+            Map<String, Object> imageCopy = new LinkedHashMap<>(image);
+            @SuppressWarnings("unchecked") Map<String, Map<String, Object>> visualizations = (Map<String, Map<String, Object>>) imageCopy.get("filter_visualizations");
+            if (visualizations != null) {
+                Map<String, Map<String, Object>> visualizationCopy = new LinkedHashMap<>();
+                for (var e : visualizations.entrySet()) {
+                    Map<String, Object> entryCopy = new LinkedHashMap<>(e.getValue());
+                    entryCopy.remove("data_uri");
+                    visualizationCopy.put(e.getKey(), entryCopy);
+                }
+                imageCopy.put("filter_visualizations", visualizationCopy);
+            }
+            copy.add(imageCopy);
+        }
+        return copy;
+    }
     private static void writeIfRequested(Path output, String content) { if (output == null) return; try { if (output.getParent() != null) Files.createDirectories(output.getParent()); Files.writeString(output, content); } catch (IOException e) { throw new IllegalStateException(e); } }
 }

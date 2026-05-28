@@ -43,6 +43,21 @@ Pipeline:
   - `zopflipng-preserve-original-filters`
   - `rewritten+zopfli-preserve`
 
+
+## Filter layout visualizations
+
+Benchmark reports include a machine-readable `filter_layouts` JSON object for every image/strategy. Each layout records per-row filter names plus run-length ranges (`start_row`, `end_row`, `row_count`, `filter`) so exact filter placement can be inspected or reused by other tools.
+
+For every non-trivial layout (more than one contiguous filter run), `benchmark` also writes a small palettized PNG preview under `filter-visualizations/` next to the markdown report. The preview is scaled so neither side exceeds 256 pixels by default and tints source rows by filter: `NONE` red, `SUB` orange, `UP` blue, `AVERAGE` green, and `PAETH` purple. Vertical downscaling preserves single-row filter runs whenever the number of runs fits in the reduced height, so isolated filter rows do not disappear just because the preview is smaller.
+
+Useful options:
+
+- `--no-filter-visualizations` — disable preview PNG generation.
+- `--filter-visualization-max-side 256` — change the preview size cap.
+- `--filter-visualization-inline` — embed previews as data URIs in markdown, useful when appending the report to `$GITHUB_STEP_SUMMARY`.
+
+The provided benchmark GitHub Action enables inline previews for its job summary while still uploading the markdown, JSON, and generated PNG artifacts.
+
 ## Quick examples
 
 ```bash
