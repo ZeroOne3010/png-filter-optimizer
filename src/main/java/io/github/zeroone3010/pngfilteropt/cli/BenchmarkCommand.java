@@ -20,6 +20,9 @@ import picocli.CommandLine.Model.CommandSpec;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -198,7 +201,7 @@ public final class BenchmarkCommand implements Runnable {
         var writer = new FilterVisualizationWriter(filterVisualizationMaxSide);
         for (var e : layouts.entrySet()) {
             if (e.getValue().isTrivial()) continue;
-            String fileName = sanitizeFileName(imageLabel) + "--" + sanitizeFileName(e.getKey()) + ".filters.png";
+            String fileName = visualizationFileName(imageLabel, e.getKey());
             FilterVisualizationWriter.Visualization visualization = writer.write(png, e.getValue(), outputDir.resolve(fileName));
             Map<String, Object> json = new LinkedHashMap<>();
             json.put("path", visualization.path().toString());
@@ -238,9 +241,31 @@ public final class BenchmarkCommand implements Runnable {
         return image.rows().stream().map(FilteredRow::filter).toList();
     }
 
+    private static String visualizationFileName(String imageLabel, String strategy) {
+        return sanitizeFileName(imageLabel)
+                + "--"
+                + shortStableHash(imageLabel)
+                + "--"
+                + sanitizeFileName(strategy)
+                + ".filters.png";
+    }
+
     private static String sanitizeFileName(String value) {
         String sanitized = value.replaceAll("[^A-Za-z0-9._-]+", "-").replaceAll("^-+|-+$", "");
         return sanitized.isBlank() ? "image" : sanitized;
+    }
+
+    private static String shortStableHash(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hash = new StringBuilder(8);
+            for (int i = 0; i < 4; i++) {
+                hash.append(String.format("%02x", digest[i] & 0xFF));
+            }
+            return hash.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 digest unavailable", e);
+        }
     }
 
     private String imageLabel(Path png) {
