@@ -8,13 +8,20 @@ on:
         required: true
         default: "src/test/resources/test-images/"
       diagnostics_mode:
-        description: "Include diagnostic output in benchmark reports (true/false)"
+        description: "Include diagnostic output in benchmark reports"
         required: false
-        default: "true"
+        type: boolean
+        default: true
+      insights_verbose:
+        description: "Include verbose compression insights in benchmark reports"
+        required: false
+        type: boolean
+        default: true
       sticky_pr_comment:
-        description: "Post sticky PR comment (true/false)"
+        description: "Post sticky PR comment"
         required: false
-        default: "false"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -58,10 +65,14 @@ jobs:
         run: |
           mkdir -p build/reports/pngfilteropt
           DIAG_FLAG=""
-          if [ "${{ github.event.inputs.diagnostics_mode }}" = "true" ]; then
+          if [ "${{ inputs.diagnostics_mode }}" = "true" ]; then
             DIAG_FLAG="--diagnostics"
           fi
-          ./gradlew --no-daemon run --args="benchmark ${{ github.event.inputs.corpus_path }} --try-all ${DIAG_FLAG} --markdown build/reports/pngfilteropt/benchmark.md --json build/reports/pngfilteropt/benchmark.json --filter-visualization-inline"
+          INSIGHTS_FLAG=""
+          if [ "${{ inputs.insights_verbose }}" = "true" ]; then
+            INSIGHTS_FLAG="--insights-verbose"
+          fi
+          ./gradlew --no-daemon run --args="benchmark ${{ inputs.corpus_path }} --try-all ${DIAG_FLAG} ${INSIGHTS_FLAG} --markdown build/reports/pngfilteropt/benchmark.md --json build/reports/pngfilteropt/benchmark.json --filter-visualization-inline"
 
       - name: Append benchmark summary
         run: cat build/reports/pngfilteropt/benchmark.md >> "$GITHUB_STEP_SUMMARY"
@@ -81,7 +92,7 @@ jobs:
 
       - name: Resolve PR context for sticky comment
         id: pr_context
-        if: ${{ github.event.inputs.sticky_pr_comment == 'true' }}
+        if: ${{ inputs.sticky_pr_comment }}
         uses: actions/github-script@v7
         with:
           script: |
@@ -93,7 +104,7 @@ jobs:
             core.setOutput('pr_number', prNumber);
 
       - name: Sticky PR comment
-        if: ${{ github.event.inputs.sticky_pr_comment == 'true' && steps.pr_context.outputs.pr_number != '' }}
+        if: ${{ inputs.sticky_pr_comment && steps.pr_context.outputs.pr_number != '' }}
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: png-corpus-benchmark
