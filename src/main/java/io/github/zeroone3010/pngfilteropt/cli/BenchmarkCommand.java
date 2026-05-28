@@ -40,6 +40,8 @@ public final class BenchmarkCommand implements Runnable {
     @Option(names = "--markdown") Path markdownOutput;
     @Option(names = "--json") Path jsonOutput;
     @Option(names = "--diagnostics") boolean diagnostics;
+    @Option(names = "--insights", description = "Render concise compression-analysis insights without full diagnostics tables.") boolean insights;
+    @Option(names = "--insights-verbose", description = "Render insight summaries with detected compression patterns.") boolean insightsVerbose;
     @Option(names = "--diagnostics-lz", negatable = true) boolean diagnosticsLz = true;
     @Option(names = "--diagnostics-lz-sample-step", defaultValue = "1") int diagnosticsLzSampleStep;
     @Option(names = "--diagnostics-lz-max-candidates", defaultValue = "16") int diagnosticsLzMaxCandidates;
@@ -119,7 +121,7 @@ public final class BenchmarkCommand implements Runnable {
                 timingsMs.put(key, nanosToMillis(System.nanoTime() - t0));
                 strategies.put(key, estimateDeflatedSize(optimized));
                 filterLayouts.put(key, FilterLayout.fromRows(filtersOf(optimized)));
-                if (diagnostics) strategyDiagnostics.put(key, diagnosticsCalculator.calculate(optimized));
+                if (diagnostics || insights || insightsVerbose) strategyDiagnostics.put(key, diagnosticsCalculator.calculate(optimized));
             }
 
             if (strategies.containsKey("rewritten+zopfli-preserve") && strategies.containsKey("zopflipng-preserve-original-filters")) {
@@ -139,10 +141,12 @@ public final class BenchmarkCommand implements Runnable {
             row.put("metadata", Map.of("original_color_type", raw.colorType(), "rewritten_color_type", raw.colorType(), "original_bit_depth", raw.bitDepth(), "rewritten_bit_depth", raw.bitDepth(), "palette_preserved", raw.paletteRgb() != null, "interlace_preserved", raw.interlaceMethod() == 0 || raw.interlaceMethod() == 1));
             row.put("filter_layouts", filterLayoutJson);
             if (!visualizationJson.isEmpty()) row.put("filter_visualizations", visualizationJson);
-            if (diagnostics) row.put("diagnostics", strategyDiagnostics);
+            if (diagnostics || insights || insightsVerbose) row.put("diagnostics", strategyDiagnostics);
             images.add(row);
         }
-        String markdown = renderMarkdown(images); if (diagnostics) markdown += new MarkdownDiagnosticsRenderer().render(images);
+        String markdown = renderMarkdown(images);
+        if (diagnostics) markdown += new MarkdownDiagnosticsRenderer().render(images, insightsVerbose);
+        else if (insights || insightsVerbose) markdown += new MarkdownDiagnosticsRenderer().renderInsightsOnly(images, insightsVerbose);
         if (!skipped.isEmpty()) {
             markdown += "\nSkipped files (decode errors):\n" + skipped.stream().map(s -> "- " + s).collect(Collectors.joining("\n")) + "\n";
         }

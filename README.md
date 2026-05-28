@@ -44,6 +44,14 @@ Pipeline:
   - `rewritten+zopfli-preserve`
 
 
+## Benchmark explanations and insights
+
+`benchmark` can attach compression-analysis text to the markdown report:
+
+- `--diagnostics` — render metric tables plus two explanation layers for each image: a concrete `Likely explanation` grounded in residual/LZ/match/filter metrics, followed by a separate `Compression insight` that synthesizes broader PNG/DEFLATE behavior.
+- `--insights` — render only concise compression insights without the full diagnostics tables.
+- `--insights-verbose` — render insight-only output with the detected compression behavior patterns, such as consistency dominance, PAETH-vs-simpler-predictor conflicts, literal row-structure preservation, useful local exceptions, directional coherence, match-quality dominance, and mixed-content behavior.
+
 ## Filter layout visualizations
 
 Benchmark reports include a machine-readable `filter_layouts` JSON object for every image/strategy. Each layout records per-row filter names plus run-length ranges (`start_row`, `end_row`, `row_count`, `filter`) so exact filter placement can be inspected or reused by other tools.
