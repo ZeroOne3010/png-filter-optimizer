@@ -59,3 +59,33 @@ Pipeline:
 - Current optimizers are heuristic proxies for eventual DEFLATE size.
 - `adaptive`, `exhaustive`, and `genetic` are not mathematically exact global minima.
 - For exact minimization claims, a true end-to-end global DEFLATE objective would need to be implemented.
+
+## How the genetic optimizer works
+
+`genetic` does **block-wise** search, not full per-row brute force:
+
+1. **Genome representation**  
+   The image height is split into `--genetic-blocks` segments. A candidate solution (genome) stores one PNG filter (`NONE/SUB/UP/AVERAGE/PAETH`) per block.
+
+2. **Row candidates are precomputed once**  
+   For every row, all filter variants are generated. A genome only chooses *which* precomputed variant each row should use (via its block’s filter).
+
+3. **Fitness = estimated compressed size**  
+   Each genome is materialized into a PNG scanline byte stream and scored by fast level-1 DEFLATE (`pigz -1`, `gzip -1`, or Java zlib fallback). Lower compressed length is better.
+
+4. **Initial population (seeded + random)**  
+   The population starts with useful seeds (all-fixed filters and entropy/adaptive/baseline-derived block assignments), then fills with random genomes.
+
+5. **Evolution loop**  
+   Per generation, genomes are scored, best ones survive, elites are copied unchanged, and children are created via crossover (one-point, two-point, uniform) plus mutation (random single-block flip with probability `--genetic-mutation`).
+
+6. **Optional child prescreening**  
+   If enabled, extra children are generated and cheaply ranked using a sum-of-absolute-residual proxy; only the best subset gets expensive DEFLATE scoring.
+
+7. **Evaluation-budget bounded**  
+   Search stops at `--genetic-evaluations` scored genomes (or configured generation limit). A score cache avoids re-evaluating duplicate genomes.
+
+8. **Final local improvement**  
+   A hill-climb pass tries swapping each block to every filter and keeps strictly improving changes until no improvement remains or budget is exhausted.
+
+In short: it explores coarse filter layouts globally with GA operators, uses fast compression as the objective, and spends a fixed scoring budget where it matters most.
