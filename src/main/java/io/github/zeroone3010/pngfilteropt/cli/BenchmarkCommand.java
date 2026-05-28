@@ -119,7 +119,7 @@ public final class BenchmarkCommand implements Runnable {
             }
 
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("image", imageLabel(png)); row.put("strategies", strategies); row.put("timings_ms", timingsMs); row.put("best", bestKey(strategies));
+            row.put("image", imageLabel(png)); row.put("strategies", strategies); row.put("timings_ms", timingsMs); row.put("best", bestKey(strategies, timingsMs));
             row.put("metadata", Map.of("original_color_type", raw.colorType(), "rewritten_color_type", raw.colorType(), "original_bit_depth", raw.bitDepth(), "rewritten_bit_depth", raw.bitDepth(), "palette_preserved", raw.paletteRgb() != null, "interlace_preserved", raw.interlaceMethod() == 0 || raw.interlaceMethod() == 1));
             if (diagnostics) row.put("diagnostics", strategyDiagnostics);
             images.add(row);
@@ -146,7 +146,25 @@ public final class BenchmarkCommand implements Runnable {
         return List.of(candidate);
     }
 
-    private static String bestKey(Map<String, Long> s){ return s.entrySet().stream().filter(e->!e.getKey().startsWith("delta-")).min(Comparator.comparingLong(Map.Entry::getValue)).orElseThrow().getKey(); }
+    private static String bestKey(Map<String, Long> sizes, Map<String, Long> timingsMs){
+        return sizes.entrySet().stream()
+                .filter(e -> !e.getKey().startsWith("delta-"))
+                .min(Comparator
+                        .comparingLong(Map.Entry<String, Long>::getValue)
+                        .thenComparingInt(e -> isGeneticDuplicateOfFixed(e.getKey(), sizes) ? 1 : 0)
+                        .thenComparingLong(e -> timingsMs.getOrDefault(e.getKey(), Long.MAX_VALUE))
+                        .thenComparing(Map.Entry::getKey))
+                .orElseThrow()
+                .getKey();
+    }
+
+    private static boolean isGeneticDuplicateOfFixed(String key, Map<String, Long> sizes) {
+        if (!"genetic".equals(key)) return false;
+        Long geneticSize = sizes.get("genetic");
+        if (geneticSize == null) return false;
+        return sizes.entrySet().stream()
+                .anyMatch(e -> e.getKey().startsWith("fixed-") && Objects.equals(e.getValue(), geneticSize));
+    }
     private String imageLabel(Path png) {
         try {
             return directory.relativize(png).toString();
