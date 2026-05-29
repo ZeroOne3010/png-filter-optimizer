@@ -56,7 +56,7 @@ Pipeline:
 
 Benchmark reports include a machine-readable `filter_layouts` JSON object for every image/strategy. Each layout records per-row filter names plus run-length ranges (`start_row`, `end_row`, `row_count`, `filter`) so exact filter placement can be inspected or reused by other tools.
 
-For every non-trivial layout (more than one contiguous filter run), `benchmark` also writes a small palettized PNG preview under `filter-visualizations/` next to the markdown report. The preview is scaled so neither side exceeds 256 pixels by default and tints source rows by filter: `NONE` red, `SUB` orange, `UP` blue, `AVERAGE` green, and `PAETH` purple. Vertical downscaling preserves single-row filter runs whenever the number of runs fits in the reduced height, so isolated filter rows do not disappear just because the preview is smaller.
+For every layout, `benchmark` also writes a small palettized PNG preview under `filter-visualizations/` next to the markdown report. The preview is scaled so neither side exceeds 256 pixels by default and tints source rows by filter: `NONE` red, `SUB` orange, `UP` blue, `AVERAGE` green, and `PAETH` purple. Vertical downscaling preserves single-row filter runs whenever the number of runs fits in the reduced height, so isolated filter rows do not disappear just because the preview is smaller.
 
 Useful options:
 

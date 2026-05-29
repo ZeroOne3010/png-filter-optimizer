@@ -204,7 +204,6 @@ public final class BenchmarkCommand implements Runnable {
         Map<String, Map<String, Object>> visualizations = new LinkedHashMap<>();
         var writer = new FilterVisualizationWriter(filterVisualizationMaxSide);
         for (var e : layouts.entrySet()) {
-            if (e.getValue().isTrivial()) continue;
             String fileName = visualizationFileName(imageLabel, e.getKey());
             FilterVisualizationWriter.Visualization visualization = writer.write(png, e.getValue(), outputDir.resolve(fileName));
             Map<String, Object> json = new LinkedHashMap<>();

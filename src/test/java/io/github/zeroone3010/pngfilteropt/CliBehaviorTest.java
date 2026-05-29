@@ -113,7 +113,10 @@ class CliBehaviorTest {
         assertTrue(json.has("images"));
         assertTrue(json.get("images").get(0).has("metadata"));
         assertTrue(json.get("images").get(0).has("timings_ms"));
+        assertTrue(json.get("images").get(0).has("filter_visualizations"));
         assertTrue(mdText.contains("Timing (ms):"));
+        assertTrue(mdText.contains("Filter layout previews"));
+        assertTrue(mdText.contains(".filters.png"));
     }
     @Test
     void benchmarkDefaultPrintsAdaptiveStrategyLine() throws Exception {
