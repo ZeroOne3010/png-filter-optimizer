@@ -64,7 +64,7 @@ Useful options:
 - `--filter-visualization-max-side 256` — change the preview size cap.
 - `--filter-visualization-inline` — embed previews as data URIs in markdown, useful only for markdown renderers that accept data URLs.
 
-The provided benchmark GitHub Action omits filter preview images from the job summary by default because GitHub markdown does not render data URL images reliably there. Set the workflow's `summary_filter_images` input to include inline previews in the job summary. When `sticky_pr_comment` is enabled, the workflow generates non-inline previews capped at 512 pixels per side, uploads them as GitHub comment attachments, and rewrites the PR comment to use the resulting `user-attachments` image URLs. Attachment uploads require a `GH_SESSION_TOKEN` secret for the `gh-image` uploader.
+The provided benchmark GitHub Action omits filter preview images from the job summary by default because GitHub markdown does not render data URL images reliably there. Set the workflow's `summary_filter_images` input to include inline previews in the job summary. When `sticky_pr_comment` resolves an open PR, the workflow generates non-inline previews capped at 512 pixels per side, publishes them through a GitHub Pages artifact under a path containing the current workflow run ID, and rewrites the PR comment to use the resulting Pages image URLs. Each Pages deployment contains only the current run's image paths, so older PR comments do not accidentally show images from newer runs after a later deployment replaces the site. The repository's Pages source must be configured for GitHub Actions deployments.
 
 ## Quick examples
 
