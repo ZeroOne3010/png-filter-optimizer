@@ -22,6 +22,11 @@ on:
         required: false
         type: boolean
         default: false
+      summary_filter_images:
+        description: "Include filter visualization images in the job summary when not posting a PR comment"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -72,7 +77,42 @@ jobs:
           if [ "${{ inputs.insights_verbose }}" = "true" ]; then
             INSIGHTS_FLAG="--insights-verbose"
           fi
-          ./gradlew --no-daemon run --args="benchmark ${{ inputs.corpus_path }} --try-all ${DIAG_FLAG} ${INSIGHTS_FLAG} --markdown build/reports/pngfilteropt/benchmark.md --json build/reports/pngfilteropt/benchmark.json --filter-visualization-inline"
+          VISUALIZATION_FLAGS="--no-filter-visualizations"
+          if [ "${{ inputs.sticky_pr_comment }}" = "true" ]; then
+            VISUALIZATION_FLAGS="--filter-visualizations --filter-visualization-max-side 512"
+          elif [ "${{ inputs.summary_filter_images }}" = "true" ]; then
+            VISUALIZATION_FLAGS="--filter-visualizations --filter-visualization-inline"
+          fi
+          ./gradlew --no-daemon run --args="benchmark ${{ inputs.corpus_path }} --try-all ${DIAG_FLAG} ${INSIGHTS_FLAG} --markdown build/reports/pngfilteropt/benchmark.md --json build/reports/pngfilteropt/benchmark.json ${VISUALIZATION_FLAGS}"
+
+      - name: Resolve PR context for sticky comment
+        id: pr_context
+        if: ${{ inputs.sticky_pr_comment }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const head = `${owner}:${context.ref.replace('refs/heads/', '')}`;
+            const { data: prs } = await github.rest.pulls.list({ owner, repo, state: 'open', head });
+            const prNumber = prs.length > 0 ? String(prs[0].number) : '';
+            core.info(prNumber ? `Resolved PR #${prNumber} for head ${head}` : `No open PR found for head ${head}`);
+            core.setOutput('pr_number', prNumber);
+
+      - name: Prepare PR comment image attachments
+        if: ${{ inputs.sticky_pr_comment && steps.pr_context.outputs.pr_number != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_SESSION_TOKEN: ${{ secrets.GH_SESSION_TOKEN }}
+        run: |
+          if [ -z "${GH_SESSION_TOKEN}" ]; then
+            echo "GH_SESSION_TOKEN secret is required to upload GitHub comment attachments." >&2
+            exit 1
+          fi
+          gh extension install drogers0/gh-image
+          python3 .github/workflows/scripts/attach-benchmark-images.py \
+            --markdown build/reports/pngfilteropt/benchmark.md \
+            --base-dir build/reports/pngfilteropt \
+            --repo "${{ github.repository }}"
 
       - name: Append benchmark summary
         run: cat build/reports/pngfilteropt/benchmark.md >> "$GITHUB_STEP_SUMMARY"
@@ -89,19 +129,6 @@ jobs:
             build/test-results/**
             build/jmh-results/**
           if-no-files-found: warn
-
-      - name: Resolve PR context for sticky comment
-        id: pr_context
-        if: ${{ inputs.sticky_pr_comment }}
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const head = `${owner}:${context.ref.replace('refs/heads/', '')}`;
-            const { data: prs } = await github.rest.pulls.list({ owner, repo, state: 'open', head });
-            const prNumber = prs.length > 0 ? String(prs[0].number) : '';
-            core.info(prNumber ? `Resolved PR #${prNumber} for head ${head}` : `No open PR found for head ${head}`);
-            core.setOutput('pr_number', prNumber);
 
       - name: Sticky PR comment
         if: ${{ inputs.sticky_pr_comment && steps.pr_context.outputs.pr_number != '' }}
