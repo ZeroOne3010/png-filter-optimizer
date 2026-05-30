@@ -22,10 +22,17 @@ on:
         required: false
         type: boolean
         default: false
+      summary_filter_images:
+        description: "Include filter visualization images in the job summary when not posting a PR comment"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
   pull-requests: write
+  pages: write
+  id-token: write
 
 jobs:
   benchmark:
@@ -61,6 +68,19 @@ jobs:
             echo "No JMH benchmarks found under src/jmh; skipping jmh task."
           fi
 
+      - name: Resolve PR context for sticky comment
+        id: pr_context
+        if: ${{ inputs.sticky_pr_comment }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const head = `${owner}:${context.ref.replace('refs/heads/', '')}`;
+            const { data: prs } = await github.rest.pulls.list({ owner, repo, state: 'open', head });
+            const prNumber = prs.length > 0 ? String(prs[0].number) : '';
+            core.info(prNumber ? `Resolved PR #${prNumber} for head ${head}` : `No open PR found for head ${head}`);
+            core.setOutput('pr_number', prNumber);
+
       - name: Run PNG corpus benchmark
         run: |
           mkdir -p build/reports/pngfilteropt
@@ -72,7 +92,44 @@ jobs:
           if [ "${{ inputs.insights_verbose }}" = "true" ]; then
             INSIGHTS_FLAG="--insights-verbose"
           fi
-          ./gradlew --no-daemon run --args="benchmark ${{ inputs.corpus_path }} --try-all ${DIAG_FLAG} ${INSIGHTS_FLAG} --markdown build/reports/pngfilteropt/benchmark.md --json build/reports/pngfilteropt/benchmark.json --filter-visualization-inline"
+          VISUALIZATION_FLAGS="--no-filter-visualizations"
+          if [ "${{ inputs.sticky_pr_comment }}" = "true" ] && [ "${{ steps.pr_context.outputs.pr_number }}" != "" ]; then
+            VISUALIZATION_FLAGS="--filter-visualizations --filter-visualization-max-side 512"
+          elif [ "${{ inputs.summary_filter_images }}" = "true" ]; then
+            VISUALIZATION_FLAGS="--filter-visualizations --filter-visualization-inline"
+          fi
+          ./gradlew --no-daemon run --args="benchmark ${{ inputs.corpus_path }} --try-all ${DIAG_FLAG} ${INSIGHTS_FLAG} --markdown build/reports/pngfilteropt/benchmark.md --json build/reports/pngfilteropt/benchmark.json ${VISUALIZATION_FLAGS}"
+
+      - name: Stage benchmark images for GitHub Pages
+        if: ${{ inputs.sticky_pr_comment && steps.pr_context.outputs.pr_number != '' }}
+        run: |
+          rm -rf build/pages
+          python3 .github/workflows/scripts/publish-benchmark-images.py \
+            --markdown build/reports/pngfilteropt/benchmark.md \
+            --base-dir build/reports/pngfilteropt \
+            --pages-dir build/pages \
+            --run-id "${{ github.run_id }}"
+
+      - name: Upload GitHub Pages artifact
+        if: ${{ inputs.sticky_pr_comment && steps.pr_context.outputs.pr_number != '' }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/pages
+
+      - name: Deploy benchmark images to GitHub Pages
+        id: deployment
+        if: ${{ inputs.sticky_pr_comment && steps.pr_context.outputs.pr_number != '' }}
+        uses: actions/deploy-pages@v4
+
+      - name: Rewrite benchmark image links to GitHub Pages
+        if: ${{ inputs.sticky_pr_comment && steps.pr_context.outputs.pr_number != '' }}
+        run: |
+          python3 .github/workflows/scripts/publish-benchmark-images.py \
+            --markdown build/reports/pngfilteropt/benchmark.md \
+            --base-dir build/reports/pngfilteropt \
+            --pages-dir build/pages \
+            --run-id "${{ github.run_id }}" \
+            --page-url "${{ steps.deployment.outputs.page_url }}"
 
       - name: Append benchmark summary
         run: cat build/reports/pngfilteropt/benchmark.md >> "$GITHUB_STEP_SUMMARY"
@@ -89,19 +146,6 @@ jobs:
             build/test-results/**
             build/jmh-results/**
           if-no-files-found: warn
-
-      - name: Resolve PR context for sticky comment
-        id: pr_context
-        if: ${{ inputs.sticky_pr_comment }}
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { owner, repo } = context.repo;
-            const head = `${owner}:${context.ref.replace('refs/heads/', '')}`;
-            const { data: prs } = await github.rest.pulls.list({ owner, repo, state: 'open', head });
-            const prNumber = prs.length > 0 ? String(prs[0].number) : '';
-            core.info(prNumber ? `Resolved PR #${prNumber} for head ${head}` : `No open PR found for head ${head}`);
-            core.setOutput('pr_number', prNumber);
 
       - name: Sticky PR comment
         if: ${{ inputs.sticky_pr_comment && steps.pr_context.outputs.pr_number != '' }}
