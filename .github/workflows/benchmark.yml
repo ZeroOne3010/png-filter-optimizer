@@ -100,8 +100,7 @@ jobs:
           fi
           ./gradlew --no-daemon run --args="benchmark ${{ inputs.corpus_path }} --try-all ${DIAG_FLAG} ${INSIGHTS_FLAG} --markdown build/reports/pngfilteropt/benchmark.md --json build/reports/pngfilteropt/benchmark.json ${VISUALIZATION_FLAGS}"
 
-      - name: Stage benchmark images for GitHub Pages
-        if: ${{ inputs.sticky_pr_comment && steps.pr_context.outputs.pr_number != '' }}
+      - name: Stage benchmark report for GitHub Pages
         run: |
           rm -rf build/pages
           python3 .github/workflows/scripts/publish-benchmark-images.py \
@@ -111,18 +110,15 @@ jobs:
             --run-id "${{ github.run_id }}"
 
       - name: Upload GitHub Pages artifact
-        if: ${{ inputs.sticky_pr_comment && steps.pr_context.outputs.pr_number != '' }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: build/pages
 
-      - name: Deploy benchmark images to GitHub Pages
+      - name: Deploy benchmark report to GitHub Pages
         id: deployment
-        if: ${{ inputs.sticky_pr_comment && steps.pr_context.outputs.pr_number != '' }}
         uses: actions/deploy-pages@v4
 
-      - name: Rewrite benchmark image links to GitHub Pages
-        if: ${{ inputs.sticky_pr_comment && steps.pr_context.outputs.pr_number != '' }}
+      - name: Add GitHub Pages report link and rewrite benchmark image links
         run: |
           python3 .github/workflows/scripts/publish-benchmark-images.py \
             --markdown build/reports/pngfilteropt/benchmark.md \
@@ -143,6 +139,7 @@ jobs:
             build/reports/pngfilteropt/benchmark.md
             build/reports/pngfilteropt/benchmark.json
             build/reports/**
+            build/pages/**
             build/test-results/**
             build/jmh-results/**
           if-no-files-found: warn
