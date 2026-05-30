@@ -15,7 +15,7 @@ stage_report = _MODULE.stage_report
 
 class PublishBenchmarkReportTest(unittest.TestCase):
     def test_stages_images_and_renders_structured_html_report(self):
-        markdown = "## Benchmark summary\n\n| Image | Best |\n|---|---|\n| icon.png | adaptive |\n\n### icon.png\n\n- adaptive: 3 ms\n\n![](filter-visualizations/icon.filters.png)\n"
+        markdown = "## Benchmark summary\n\n### Table of contents\n- [icon.png](#icon.png)\n\n| Image | Best |\n|---|---|\n| icon.png | adaptive |\n\n### icon.png\n\n- adaptive: 3 ms\n\n![](filter-visualizations/icon.filters.png)\n"
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             image = root / "reports/filter-visualizations/icon.filters.png"
@@ -24,8 +24,10 @@ class PublishBenchmarkReportTest(unittest.TestCase):
             copied = stage_report(markdown, root / "reports", root / "pages", "123")
             report = (root / "pages/123/index.html").read_text()
             self.assertEqual(["filter-visualizations/icon.filters.png"], copied)
-            self.assertIn("<h2>Benchmark summary</h2>", report)
+            self.assertIn('<h2 id="Benchmark summary">Benchmark summary</h2>', report)
             self.assertIn("<table>", report)
+            self.assertIn('<a href="#icon.png">icon.png</a>', report)
+            self.assertIn('<h3 id="icon.png">icon.png</h3>', report)
             self.assertTrue((root / "pages/123/report.md").is_file())
             self.assertIn("<li>adaptive: 3 ms</li>", report)
             self.assertTrue((root / "pages/123/filter-visualizations/icon.filters.png").is_file())

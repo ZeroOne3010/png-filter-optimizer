@@ -123,7 +123,8 @@ def _render_block(block: Block) -> str:
     if block.kind == "heading":
         marker, text = block.lines[0].split(" ", 1)
         level = min(len(marker), 6)
-        return f"<h{level}>{_render_inline(text)}</h{level}>"
+        heading_id = html.escape(text, quote=True)
+        return f'<h{level} id="{heading_id}">{_render_inline(text)}</h{level}>'
     if block.kind == "list":
         return "<ul>\n" + "\n".join(f"<li>{_render_inline(line[2:])}</li>" for line in block.lines) + "\n</ul>"
     if block.kind == "table":
