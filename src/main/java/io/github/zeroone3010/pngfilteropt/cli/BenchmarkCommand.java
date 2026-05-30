@@ -39,18 +39,6 @@ public final class BenchmarkCommand implements Runnable {
     @Mixin CliOptions.OptimizerSelection optimizerSelection;
     @Option(names = "--markdown") Path markdownOutput;
     @Option(names = "--json") Path jsonOutput;
-    @Option(names = "--diagnostics") boolean diagnostics;
-    @Option(names = "--insights", description = "Render concise compression-analysis insights without full diagnostics tables.") boolean insights;
-    @Option(names = "--insights-verbose", description = "Render insight summaries with detected compression patterns.") boolean insightsVerbose;
-    @Option(names = "--diagnostics-lz", negatable = true) boolean diagnosticsLz = true;
-    @Option(names = "--diagnostics-lz-sample-step", defaultValue = "1") int diagnosticsLzSampleStep;
-    @Option(names = "--diagnostics-lz-max-candidates", defaultValue = "16") int diagnosticsLzMaxCandidates;
-    @Option(names = "--benchmark-controls", description = "Enable control/reference benchmark variants.") boolean benchmarkControls = true;
-    @Option(names = "--benchmark-zopfli-original", description = "Include zopfli runs against original PNGs.") boolean benchmarkZopfliOriginal = true;
-    @Option(names = "--benchmark-preserve-original-filters", description = "Include zopfli preserve-filters control runs.") boolean benchmarkPreserveOriginalFilters = true;
-    @Option(names = "--filter-visualizations", negatable = true, defaultValue = "true", fallbackValue = "true", description = "Write small palettized PNG previews that tint each row by its selected PNG filter.") boolean filterVisualizations = true;
-    @Option(names = "--filter-visualization-max-side", defaultValue = "256", description = "Maximum width or height for filter visualization PNGs.") int filterVisualizationMaxSide = FilterVisualizationWriter.DEFAULT_MAX_SIDE;
-    @Option(names = "--filter-visualization-inline", negatable = true, description = "Embed filter visualization PNGs as data URIs in markdown, useful for GitHub step summaries.") boolean filterVisualizationInline = false;
 
     @Override public void run() {
         var decoder = new PngDecoder(); var encoder = new PngEncoder(); var inspector = new FilterInspector(); var candidates = new CandidateGenerator();
@@ -63,7 +51,7 @@ public final class BenchmarkCommand implements Runnable {
 
         List<Map<String, Object>> images = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
-        var diagnosticsCalculator = new DiagnosticsCalculator(diagnosticsLz, diagnosticsLzMaxCandidates);
+        var diagnosticsCalculator = new DiagnosticsCalculator();
         for (Path png : benchmarkTargets()) {
             RawImage raw;
             try {
@@ -93,16 +81,14 @@ public final class BenchmarkCommand implements Runnable {
             timingsMs.put("rewritten-baseline", 0L);
 
             Path tmpDir = tempDir();
-            if (optimizerSelection.zopflipngPath != null && benchmarkControls && benchmarkZopfliOriginal) {
+            if (optimizerSelection.zopflipngPath != null) {
                 ZopfliRunner runner = new ZopfliRunner();
                 long t0 = System.nanoTime();
                 strategies.put("zopflipng-default-original", runner.recompress(png, tmpDir.resolve("zdefault.png"), optimizerSelection.zopflipngPath, false));
                 timingsMs.put("zopflipng-default-original", nanosToMillis(System.nanoTime() - t0));
-                if (benchmarkPreserveOriginalFilters) {
-                    t0 = System.nanoTime();
-                    strategies.put("zopflipng-preserve-original-filters", runner.recompress(png, tmpDir.resolve("zpreserve-original.png"), optimizerSelection.zopflipngPath, true));
-                    timingsMs.put("zopflipng-preserve-original-filters", nanosToMillis(System.nanoTime() - t0));
-                }
+                t0 = System.nanoTime();
+                strategies.put("zopflipng-preserve-original-filters", runner.recompress(png, tmpDir.resolve("zpreserve-original.png"), optimizerSelection.zopflipngPath, true));
+                timingsMs.put("zopflipng-preserve-original-filters", nanosToMillis(System.nanoTime() - t0));
                 Path rewrittenPath = tmpDir.resolve("rewritten.png");
                 encoder.encode(rewrittenBaseline, rewrittenPath);
                 t0 = System.nanoTime();
@@ -121,7 +107,7 @@ public final class BenchmarkCommand implements Runnable {
                 timingsMs.put(key, nanosToMillis(System.nanoTime() - t0));
                 strategies.put(key, estimateDeflatedSize(optimized));
                 filterLayouts.put(key, FilterLayout.fromRows(filtersOf(optimized)));
-                if (diagnostics || insights || insightsVerbose) strategyDiagnostics.put(key, diagnosticsCalculator.calculate(optimized));
+                strategyDiagnostics.put(key, diagnosticsCalculator.calculate(optimized));
             }
 
             if (strategies.containsKey("rewritten+zopfli-preserve") && strategies.containsKey("zopflipng-preserve-original-filters")) {
@@ -132,21 +118,17 @@ public final class BenchmarkCommand implements Runnable {
             }
 
             Map<String, Object> filterLayoutJson = toFilterLayoutJson(filterLayouts);
-            Map<String, Map<String, Object>> visualizationJson = filterVisualizations
-                    ? writeFilterVisualizations(png, imageLabel(png), filterLayouts, shouldInlineVisualizations(), visualizationOutputDirectory())
-                    : new LinkedHashMap<>();
+            Map<String, Map<String, Object>> visualizationJson = writeFilterVisualizations(png, imageLabel(png), filterLayouts, visualizationOutputDirectory());
 
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("image", imageLabel(png)); row.put("strategies", strategies); row.put("timings_ms", timingsMs); row.put("best", bestKey(strategies, timingsMs));
-            row.put("metadata", Map.of("original_color_type", raw.colorType(), "rewritten_color_type", raw.colorType(), "original_bit_depth", raw.bitDepth(), "rewritten_bit_depth", raw.bitDepth(), "palette_preserved", raw.paletteRgb() != null, "interlace_preserved", raw.interlaceMethod() == 0 || raw.interlaceMethod() == 1));
+            row.put("metadata", Map.of("width", raw.width(), "height", raw.height(), "bytes_per_pixel", raw.bytesPerPixel(), "bytes_per_row", raw.bytesPerRow(), "original_color_type", raw.colorType(), "rewritten_color_type", raw.colorType(), "original_bit_depth", raw.bitDepth(), "rewritten_bit_depth", raw.bitDepth(), "palette_preserved", raw.paletteRgb() != null, "interlace_preserved", raw.interlaceMethod() == 0 || raw.interlaceMethod() == 1));
             row.put("filter_layouts", filterLayoutJson);
             if (!visualizationJson.isEmpty()) row.put("filter_visualizations", visualizationJson);
-            if (diagnostics || insights || insightsVerbose) row.put("diagnostics", strategyDiagnostics);
+            row.put("diagnostics", strategyDiagnostics);
             images.add(row);
         }
         String markdown = renderMarkdown(images);
-        if (diagnostics) markdown += new MarkdownDiagnosticsRenderer().render(images, insightsVerbose);
-        else if (insights || insightsVerbose) markdown += new MarkdownDiagnosticsRenderer().renderInsightsOnly(images, insightsVerbose);
         if (!skipped.isEmpty()) {
             markdown += "\nSkipped files (decode errors):\n" + skipped.stream().map(s -> "- " + s).collect(Collectors.joining("\n")) + "\n";
         }
@@ -187,12 +169,6 @@ public final class BenchmarkCommand implements Runnable {
         return sizes.entrySet().stream()
                 .anyMatch(e -> e.getKey().startsWith("fixed-") && Objects.equals(e.getValue(), geneticSize));
     }
-    private boolean shouldInlineVisualizations() {
-        if (filterVisualizationInline) return true;
-        String githubStepSummary = System.getenv("GITHUB_STEP_SUMMARY");
-        return markdownOutput != null && githubStepSummary != null && markdownOutput.toAbsolutePath().normalize().equals(Path.of(githubStepSummary).toAbsolutePath().normalize());
-    }
-
     private Path visualizationOutputDirectory() {
         Path base = markdownOutput != null && markdownOutput.getParent() != null
                 ? markdownOutput.getParent()
@@ -200,7 +176,7 @@ public final class BenchmarkCommand implements Runnable {
         return base.resolve("filter-visualizations");
     }
 
-    private Map<String, Map<String, Object>> writeFilterVisualizations(Path png, String imageLabel, Map<String, FilterLayout> layouts, boolean inline, Path outputDir) {
+    private Map<String, Map<String, Object>> writeFilterVisualizations(Path png, String imageLabel, Map<String, FilterLayout> layouts, Path outputDir) {
         Map<String, Map<String, Object>> visualizations = new LinkedHashMap<>();
         var writer = new FilterVisualizationWriter(filterVisualizationMaxSide);
         for (var e : layouts.entrySet()) {
@@ -211,7 +187,6 @@ public final class BenchmarkCommand implements Runnable {
             json.put("path", visualization.path().toString());
             json.put("markdown_src", markdownVisualizationSource(visualization.path()));
             json.put("bytes", visualization.bytes());
-            if (inline) json.put("data_uri", visualization.dataUri());
             visualizations.put(e.getKey(), json);
         }
         return visualizations;
@@ -318,48 +293,75 @@ public final class BenchmarkCommand implements Runnable {
     }
 
     private static String renderMarkdown(List<Map<String, Object>> images){
-        if(images.isEmpty()) return "| image | original | best |\n|---|---:|---|\n";
-        @SuppressWarnings("unchecked") Map<String,Long> first=(Map<String,Long>)images.get(0).get("strategies");
-        List<String> cols=new ArrayList<>(first.keySet());
-        cols.remove("original");
-        cols.remove("baseline");
+        if(images.isEmpty()) return "| Image | Best strategy |\n|---|---|\n";
 
         StringBuilder sb=new StringBuilder("## Benchmark summary\n\n");
         sb.append("Original = input PNG size on disk. Rewritten baseline = the same per-row filters rebuilt through this tool and then DEFLATE-estimated; this isolates rewrite/stream effects from filter-choice changes.\n\n");
         sb.append("Compression-case guide: smaller numbers are better, and a gap between `original` and `rewritten-baseline` means the rewritten IDAT stream changed compression behavior even with equivalent row filters.\n\n");
-        sb.append("### Table of contents\n");
-        for(var image:images) sb.append("- [").append(image.get("image")).append("](#").append(image.get("image")).append(")\n");
-        sb.append("\n| Image | Original");
-        for(String c:cols) sb.append(" | ").append(c);
-        sb.append(" | Best |\n|---|---:");
-        for(int i=0;i<cols.size();i++) sb.append("|---:");
-        sb.append("|---|\n");
+        sb.append("| Image | Best strategy |\n|---|---|\n");
         for(var image:images){
-            @SuppressWarnings("unchecked") Map<String,Long> s=(Map<String,Long>)image.get("strategies");
-            sb.append("| ").append(image.get("image")).append(" | ").append(formatNumber(s.get("original")));
-            for(String c:cols) sb.append(" | ").append(formatNumber(s.get(c)));
-            sb.append(" | ").append(image.get("best")).append(" |\n");
+            sb.append("| [").append(image.get("image")).append("](#").append(anchor(image.get("image").toString())).append(") | ").append(image.get("best")).append(" |\n");
         }
         sb.append("\n");
+        MarkdownDiagnosticsRenderer diagnosticsRenderer = new MarkdownDiagnosticsRenderer();
         for(var image:images){
+            sb.append("<a id=\"").append(anchor(image.get("image").toString())).append("\"></a>\n");
             sb.append("### ").append(image.get("image")).append("\n\n");
-            @SuppressWarnings("unchecked") Map<String,Long> t=(Map<String,Long>)image.get("timings_ms");
-            if(t!=null){
-                sb.append("Timing (ms):\n\n");
-                for (var e : t.entrySet()) sb.append("- ").append(e.getKey()).append(": ").append(e.getValue()).append(" ms\n");
-                sb.append("\n");
-            }
+            appendMetadata(sb, image);
+            appendStrategyResults(sb, image);
+            diagnosticsRenderer.appendDiagnostics(sb, image, true);
             @SuppressWarnings("unchecked") Map<String, Map<String, Object>> visualizations=(Map<String, Map<String, Object>>)image.get("filter_visualizations");
             if(visualizations!=null && !visualizations.isEmpty()){
                 sb.append("Filter layout previews (row tint: NONE red, SUB orange, UP blue, AVERAGE green, PAETH purple):\n\n");
                 for (var e : visualizations.entrySet()) {
-                    Object src = e.getValue().containsKey("data_uri") ? e.getValue().get("data_uri") : e.getValue().getOrDefault("markdown_src", e.getValue().get("path"));
+                    Object src = e.getValue().getOrDefault("markdown_src", e.getValue().get("path"));
                     sb.append("**").append(e.getKey()).append("**\n\n");
                     sb.append("![](").append(src).append(")\n\n");
                 }
             }
         }
         return sb.toString();
+    }
+
+    private static void appendMetadata(StringBuilder sb, Map<String, Object> image) {
+        @SuppressWarnings("unchecked") Map<String, Object> metadata=(Map<String, Object>)image.get("metadata");
+        sb.append("PNG metadata: width=").append(metadata.get("width"))
+                .append(", height=").append(metadata.get("height"))
+                .append(", color type=").append(metadata.get("original_color_type"))
+                .append(", bit depth=").append(metadata.get("original_bit_depth"))
+                .append(", bytes per pixel=").append(metadata.get("bytes_per_pixel"))
+                .append(", bytes per row=").append(metadata.get("bytes_per_row"))
+                .append(", palette preserved=").append(metadata.get("palette_preserved"))
+                .append(", interlace preserved=").append(metadata.get("interlace_preserved")).append("\n\n");
+    }
+
+    private static void appendStrategyResults(StringBuilder sb, Map<String, Object> image) {
+        @SuppressWarnings("unchecked") Map<String, Long> sizes=(Map<String, Long>)image.get("strategies");
+        @SuppressWarnings("unchecked") Map<String, Long> timings=(Map<String, Long>)image.get("timings_ms");
+        @SuppressWarnings("unchecked") Map<String, Map<String, Object>> layouts=(Map<String, Map<String, Object>>)image.get("filter_layouts");
+        String best=(String)image.get("best");
+        long bestSize=sizes.get(best);
+        sb.append("| Strategy | Size (bytes) | Ratio vs best | NONE | SUB | UP | AVERAGE | PAETH | Time (ms) |\n");
+        sb.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+        for (var e : sizes.entrySet()) {
+            if (e.getKey().startsWith("delta-")) continue;
+            boolean winner=e.getKey().equals(best);
+            String strong=winner ? "<strong>" : "";
+            String endStrong=winner ? "</strong>" : "";
+            sb.append("| ").append(strong).append(e.getKey()).append(endStrong)
+                    .append(" | ").append(strong).append(formatNumber(e.getValue())).append(endStrong)
+                    .append(" | ").append(strong).append(String.format("%.2f%%", 100.0 * e.getValue() / bestSize)).append(endStrong);
+            @SuppressWarnings("unchecked") Map<PngFilter, Integer> counts=layouts.containsKey(e.getKey()) ? (Map<PngFilter, Integer>)layouts.get(e.getKey()).get("filter_counts") : Map.of();
+            for (PngFilter filter : PngFilter.values()) sb.append(" | ").append(strong).append(counts.getOrDefault(filter, 0)).append(endStrong);
+            sb.append(" | ").append(strong).append(timings.getOrDefault(e.getKey(), 0L)).append(endStrong).append(" |\n");
+        }
+        List<String> deltas=sizes.entrySet().stream().filter(e -> e.getKey().startsWith("delta-")).map(e -> e.getKey() + "=" + formatNumber(e.getValue()) + " bytes").toList();
+        if (!deltas.isEmpty()) sb.append("\nControl deltas: ").append(String.join(", ", deltas)).append(".\n");
+        sb.append("\n");
+    }
+
+    private static String anchor(String image) {
+        return "image-" + sanitizeFileName(image).toLowerCase(Locale.ROOT) + "-" + shortStableHash(image);
     }
 
     private static String renderJson(List<Map<String, Object>> images){ try { return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("images", jsonImages(images)))+"\n"; } catch (JsonProcessingException e) { throw new IllegalStateException(e); } }
