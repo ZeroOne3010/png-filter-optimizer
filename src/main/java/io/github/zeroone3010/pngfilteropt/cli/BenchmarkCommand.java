@@ -48,7 +48,7 @@ public final class BenchmarkCommand implements Runnable {
     @Option(names = "--benchmark-controls", description = "Enable control/reference benchmark variants.") boolean benchmarkControls = true;
     @Option(names = "--benchmark-zopfli-original", description = "Include zopfli runs against original PNGs.") boolean benchmarkZopfliOriginal = true;
     @Option(names = "--benchmark-preserve-original-filters", description = "Include zopfli preserve-filters control runs.") boolean benchmarkPreserveOriginalFilters = true;
-    @Option(names = "--filter-visualizations", negatable = true, description = "Write small palettized PNG previews that tint each row by its selected PNG filter.") boolean filterVisualizations = true;
+    @Option(names = "--filter-visualizations", negatable = true, defaultValue = "true", fallbackValue = "true", description = "Write small palettized PNG previews that tint each row by its selected PNG filter.") boolean filterVisualizations = true;
     @Option(names = "--filter-visualization-max-side", defaultValue = "256", description = "Maximum width or height for filter visualization PNGs.") int filterVisualizationMaxSide = FilterVisualizationWriter.DEFAULT_MAX_SIDE;
     @Option(names = "--filter-visualization-inline", negatable = true, description = "Embed filter visualization PNGs as data URIs in markdown, useful for GitHub step summaries.") boolean filterVisualizationInline = false;
 
@@ -204,6 +204,7 @@ public final class BenchmarkCommand implements Runnable {
         Map<String, Map<String, Object>> visualizations = new LinkedHashMap<>();
         var writer = new FilterVisualizationWriter(filterVisualizationMaxSide);
         for (var e : layouts.entrySet()) {
+            if (e.getValue().isTrivial()) continue;
             String fileName = visualizationFileName(imageLabel, e.getKey());
             FilterVisualizationWriter.Visualization visualization = writer.write(png, e.getValue(), outputDir.resolve(fileName));
             Map<String, Object> json = new LinkedHashMap<>();

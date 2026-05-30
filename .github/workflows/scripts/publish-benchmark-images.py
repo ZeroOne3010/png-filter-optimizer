@@ -36,11 +36,8 @@ def stage_images(markdown: str, base_dir: Path, pages_dir: Path, run_id: str) ->
     run_dir = pages_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     copied: list[str] = []
-    refs = image_refs(markdown)
-    if not refs:
-        raise RuntimeError("Benchmark markdown does not contain any local PNG image references to publish")
 
-    for src in refs:
+    for src in image_refs(markdown):
         relative_path = safe_relative_path(src)
         source = (base_dir / relative_path).resolve()
         if not source.is_file():
