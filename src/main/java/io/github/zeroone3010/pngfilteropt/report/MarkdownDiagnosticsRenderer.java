@@ -34,7 +34,7 @@ public final class MarkdownDiagnosticsRenderer {
             long distTotal = java.util.Arrays.stream(lz.matchDistanceBuckets()).sum();
             double shortPct = distTotal == 0 ? 0 : (100.0 * lz.matchDistanceBuckets()[0] / distTotal);
             double longPct = distTotal == 0 ? 0 : (100.0 * lz.matchDistanceBuckets()[4] / distTotal);
-            sb.append("| ").append(e.getKey()).append(" | ").append(lz.approximateLzCostBits()).append(" | ").append(String.format("%.1f", lz.matchCoveragePercent())).append(" | ").append(String.format("%.1f", lz.averageMatchLength())).append(" | ").append(matches64).append(" | ").append(String.format("%.1f", shortPct)).append(" | ").append(String.format("%.1f", longPct)).append(" |\n");
+            sb.append("| ").append(e.getKey()).append(" | ").append(formatNumber(lz.approximateLzCostBits())).append(" | ").append(String.format("%.1f", lz.matchCoveragePercent())).append(" | ").append(String.format("%.1f", lz.averageMatchLength())).append(" | ").append(matches64).append(" | ").append(String.format("%.1f", shortPct)).append(" | ").append(String.format("%.1f", longPct)).append(" |\n");
         }
     }
 
@@ -45,12 +45,22 @@ public final class MarkdownDiagnosticsRenderer {
         sb.append("| Vertical/Horizontal ratio | ").append(String.format("%.2f", diagnostics.directionalSmoothness().verticalHorizontalRatio())).append(" |\n");
     }
 
+    static String formatNumber(long value) {
+        String digits = Long.toString(Math.abs(value));
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < digits.length(); i++) {
+            if (i > 0 && (digits.length() - i) % 3 == 0) out.append('\u2007');
+            out.append(digits.charAt(i));
+        }
+        return value < 0 ? "-" + out : out.toString();
+    }
+
     private void appendResidualSumAbs(StringBuilder sb, FilteredStreamDiagnostics diagnostics) {
         sb.append("\nResidual sumAbs:\n\n| Filter | SumAbs |\n|---|---:|\n");
-        sb.append("| NONE | ").append(diagnostics.residualDiagnostics().noneSumAbs()).append(" |\n");
-        sb.append("| SUB | ").append(diagnostics.residualDiagnostics().subSumAbs()).append(" |\n");
-        sb.append("| UP | ").append(diagnostics.residualDiagnostics().upSumAbs()).append(" |\n");
-        sb.append("| AVERAGE | ").append(diagnostics.residualDiagnostics().averageSumAbs()).append(" |\n");
-        sb.append("| PAETH | ").append(diagnostics.residualDiagnostics().paethSumAbs()).append(" |\n");
+        sb.append("| NONE | ").append(formatNumber(diagnostics.residualDiagnostics().noneSumAbs())).append(" |\n");
+        sb.append("| SUB | ").append(formatNumber(diagnostics.residualDiagnostics().subSumAbs())).append(" |\n");
+        sb.append("| UP | ").append(formatNumber(diagnostics.residualDiagnostics().upSumAbs())).append(" |\n");
+        sb.append("| AVERAGE | ").append(formatNumber(diagnostics.residualDiagnostics().averageSumAbs())).append(" |\n");
+        sb.append("| PAETH | ").append(formatNumber(diagnostics.residualDiagnostics().paethSumAbs())).append(" |\n");
     }
 }

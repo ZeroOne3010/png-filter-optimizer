@@ -22,7 +22,7 @@ Pipeline:
 
 ## Valid CLI optimizer names (`--optimizer`)
 
-- `baseline` — preserves current filter strategy and only recompresses.
+- `rewritten-baseline` — preserves the current filter strategy and only recompresses.
 - `entropy` — chooses per-row filters by Shannon entropy heuristics.
 - `adaptive` — greedy per-row sum-of-absolute-values heuristic (fast, not true global DEFLATE optimization).
 - `exhaustive` — beam search over row filter sequences scored by LZ-style heuristics (`--beam` controls search width).
@@ -46,15 +46,15 @@ Pipeline:
 
 ## Benchmark explanations and insights
 
-`benchmark` always writes the maximal report. The summary table links each image name to a localized image section containing PNG metadata, per-strategy size and timing results, ratios against the winning strategy, filter distributions, compression explanations, verbose insights, collapsible diagnostic tables, and filter-layout previews.
+`benchmark` always writes the maximal report. The summary table links each image name to a localized image section containing PNG metadata, per-strategy size and timing results, ratios against the winning strategy, the source image, filter distributions, compression explanations, verbose insights, collapsible diagnostic tables, and filter-layout previews.
 
 ## Filter layout visualizations
 
-Benchmark reports include a machine-readable `filter_layouts` JSON object for every image/strategy. Each layout records per-row filter names plus run-length ranges (`start_row`, `end_row`, `row_count`, `filter`) so exact filter placement can be inspected or reused by other tools.
+Benchmark reports copy each original PNG under `source-images/` next to the markdown report and display it directly below the image title. Reports also include a machine-readable `filter_layouts` JSON object for every image/strategy. Each layout records per-row filter names plus run-length ranges (`start_row`, `end_row`, `row_count`, `filter`) so exact filter placement can be inspected or reused by other tools.
 
 For every non-trivial layout (more than one contiguous filter run), `benchmark` also writes a small palettized PNG preview under `filter-visualizations/` next to the markdown report. The preview is scaled so neither side exceeds 256 pixels by default and tints source rows by filter: `NONE` red, `SUB` orange, `UP` blue, `AVERAGE` green, and `PAETH` purple. Vertical downscaling preserves single-row filter runs whenever the number of runs fits in the reduced height, so isolated filter rows do not disappear just because the preview is smaller.
 
-The provided benchmark GitHub Action publishes previews through a GitHub Pages artifact under a path containing the current workflow run ID and rewrites report image references to the resulting Pages URLs. Each Pages deployment contains only the current run's image paths, so older PR comments do not accidentally show images from newer runs after a later deployment replaces the site. The repository's Pages source must be configured for GitHub Actions deployments.
+The provided benchmark GitHub Action publishes source images and previews through a GitHub Pages artifact under a path containing the current workflow run ID and rewrites report image references to the resulting Pages URLs. Each Pages deployment contains only the current run's image paths, so older PR comments do not accidentally show images from newer runs after a later deployment replaces the site. The repository's Pages source must be configured for GitHub Actions deployments.
 
 ## Quick examples
 
@@ -87,7 +87,7 @@ The provided benchmark GitHub Action publishes previews through a GitHub Pages a
    Each genome is materialized into a PNG scanline byte stream and scored by fast level-1 DEFLATE (`pigz -1`, `gzip -1`, or Java zlib fallback). Lower compressed length is better.
 
 4. **Initial population (seeded + random)**  
-   The population starts with useful seeds (all-fixed filters and entropy/adaptive/baseline-derived block assignments), then fills with random genomes.
+   The population starts with useful seeds (all-fixed filters and entropy/adaptive/fixed-NONE block assignments), then fills with random genomes.
 
 5. **Evolution loop**  
    Per generation, genomes are scored, best ones survive, elites are copied unchanged, and children are created via crossover (one-point, two-point, uniform) plus mutation (random single-block flip with probability `--genetic-mutation`).

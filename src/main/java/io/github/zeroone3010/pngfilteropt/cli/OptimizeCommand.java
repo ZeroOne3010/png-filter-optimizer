@@ -81,7 +81,7 @@ public final class OptimizeCommand implements Runnable {
 
         for (CliOptions.OptimizerName name : selected) {
             FilteredImage candidate;
-            if (name == CliOptions.OptimizerName.BASELINE) {
+            if (name == CliOptions.OptimizerName.REWRITTEN_BASELINE) {
                 var inputFilters = inspector.listFilters(input, raw);
                 List<FilteredRow> rows = new java.util.ArrayList<>(raw.height());
                 for (int y = 0; y < raw.height(); y++) {
@@ -97,7 +97,7 @@ public final class OptimizeCommand implements Runnable {
                 FilterOptimizer optimizer = optimizers.get(name);
                 candidate = optimizer.optimize(raw, candidates);
             }
-            if (optimizerSelection.optimizerLogs && name != CliOptions.OptimizerName.BASELINE) {
+            if (optimizerSelection.optimizerLogs && name != CliOptions.OptimizerName.REWRITTEN_BASELINE) {
                 FilterOptimizer optimizer = optimizers.get(name);
                 optimizer.explainLastRun().ifPresent(msg -> spec.commandLine().getOut().printf("optimizer-log[%s]: %s%n", name.name().toLowerCase().replace('_','-'), msg.replace("\n", " | ")));
             }

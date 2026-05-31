@@ -134,7 +134,7 @@ public final class GeneticSplitOptimizer implements FilterOptimizer {
         List<NamedSeed> seeds = new ArrayList<>();
         seeds.add(new NamedSeed("entropy", fromRows(image, rowCandidates, y -> rowCandidates.get(y).stream().min(Comparator.comparingLong(r -> entropyish(r.filteredBytes()))).orElse(rowCandidates.get(y).get(0)).filter())));
         seeds.add(new NamedSeed("adaptive", fromRows(image, rowCandidates, y -> rowCandidates.get(y).stream().min(Comparator.comparingLong(r -> sumAbs(r.filteredBytes()))).orElse(rowCandidates.get(y).get(0)).filter())));
-        seeds.add(new NamedSeed("baseline", fromRows(image, rowCandidates, y -> rowCandidates.get(y).get(0).filter())));
+        seeds.add(new NamedSeed("fixed-none", fromRows(image, rowCandidates, y -> rowCandidates.get(y).get(0).filter())));
         List<RegionCandidate> regions = findDisagreementRegions(bestFixed, seeds, blocks);
 
         List<RegionScore> improvedSingles = new ArrayList<>();

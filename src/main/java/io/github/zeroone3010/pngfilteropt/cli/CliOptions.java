@@ -1,11 +1,12 @@
 package io.github.zeroone3010.pngfilteropt.cli;
 
+import picocli.CommandLine.ITypeConverter;
 import picocli.CommandLine.Option;
 
 import java.nio.file.Path;
 
 public final class CliOptions {
-    public static final String DESC_BASELINE = "Preserves current filter strategy and only recompresses.";
+    public static final String DESC_REWRITTEN_BASELINE = "Preserves current filter strategy and only recompresses.";
     public static final String DESC_ENTROPY = "Chooses per-row filters by Shannon entropy heuristics.";
     public static final String DESC_ADAPTIVE = "Greedy per-row sum-of-absolute-values heuristic (fast, not true global DEFLATE optimization).";
     public static final String DESC_EXHAUSTIVE = "Beam search over row filter sequences scored by LZ-style heuristics; larger --beam explores more paths but is not globally optimal.";
@@ -16,7 +17,7 @@ public final class CliOptions {
     public static final String DESC_FIXED_AVERAGE = "Forces filter 3 (AVERAGE) for every row as a fixed reference column.";
     public static final String DESC_FIXED_PAETH = "Forces filter 4 (PAETH) for every row as a fixed reference column.";
     public static final String DESC_ORIGINAL = "Original input PNG size without re-filtering.";
-    public static final String DESC_ZOPFLIPNG_DEFAULT = "Original PNG size used as placeholder for default zopflipng recompression baseline.";
+    public static final String DESC_ZOPFLIPNG_DEFAULT = "Original PNG size used as placeholder for default zopflipng recompression reference.";
     public static final String DESC_BEST = "Smallest strategy value on each image row.";
 
     private CliOptions() {
@@ -26,11 +27,12 @@ public final class CliOptions {
         @Option(
                 names = "--optimizer",
                 split = ",",
+                converter = OptimizerNameConverter.class,
                 paramLabel = "NAME[,NAME...]",
                 description = {
                         "Optimizer(s) to run. Can be provided multiple times or as comma-separated values.",
                         "Available names:",
-                        "  baseline  - " + DESC_BASELINE,
+                        "  rewritten-baseline - " + DESC_REWRITTEN_BASELINE,
                         "  entropy   - " + DESC_ENTROPY,
                         "  adaptive  - " + DESC_ADAPTIVE,
                         "  exhaustive- " + DESC_EXHAUSTIVE,
@@ -111,8 +113,15 @@ public final class CliOptions {
         public boolean optimizerLogs;
     }
 
+    public static final class OptimizerNameConverter implements ITypeConverter<OptimizerName> {
+        @Override
+        public OptimizerName convert(String value) {
+            return OptimizerName.valueOf(value.toUpperCase(java.util.Locale.ROOT).replace('-', '_'));
+        }
+    }
+
     public enum OptimizerName {
-        BASELINE,
+        REWRITTEN_BASELINE,
         ENTROPY,
         ADAPTIVE,
         EXHAUSTIVE,
