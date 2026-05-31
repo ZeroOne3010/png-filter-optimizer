@@ -209,7 +209,8 @@ class CliBehaviorTest {
         assertTrue(mdText.contains("Residual sumAbs:"));
         assertTrue(mdText.contains("Likely explanation:"));
         assertTrue(mdText.contains("Compression insight:"));
-        assertTrue(mdText.contains("Patterns detected:"));
+        assertTrue(mdText.contains("Compression observations:"));
+        assertFalse(mdText.contains("Patterns detected:"));
         assertTrue(mdText.contains("approximate LZ longest-match estimation"));
         var json = new ObjectMapper().readTree(jsonText);
         assertTrue(json.get("images").get(0).has("diagnostics"));
