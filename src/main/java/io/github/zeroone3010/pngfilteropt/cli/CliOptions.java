@@ -1,5 +1,6 @@
 package io.github.zeroone3010.pngfilteropt.cli;
 
+import picocli.CommandLine.ITypeConverter;
 import picocli.CommandLine.Option;
 
 import java.nio.file.Path;
@@ -26,6 +27,7 @@ public final class CliOptions {
         @Option(
                 names = "--optimizer",
                 split = ",",
+                converter = OptimizerNameConverter.class,
                 paramLabel = "NAME[,NAME...]",
                 description = {
                         "Optimizer(s) to run. Can be provided multiple times or as comma-separated values.",
@@ -109,6 +111,13 @@ public final class CliOptions {
 
         @Option(names = "--optimizer-logs", description = "Print optimizer-specific insight/log lines when available.")
         public boolean optimizerLogs;
+    }
+
+    public static final class OptimizerNameConverter implements ITypeConverter<OptimizerName> {
+        @Override
+        public OptimizerName convert(String value) {
+            return OptimizerName.valueOf(value.toUpperCase(java.util.Locale.ROOT).replace('-', '_'));
+        }
     }
 
     public enum OptimizerName {

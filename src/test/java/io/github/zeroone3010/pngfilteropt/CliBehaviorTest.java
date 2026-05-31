@@ -222,10 +222,13 @@ class CliBehaviorTest {
 
         int rewrittenExit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
                 .execute("optimize", input.toString(), root.resolve("rewritten.png").toString(), "--optimizer", "rewritten-baseline");
+        int fixedNoneExit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .execute("optimize", input.toString(), root.resolve("fixed-none.png").toString(), "--optimizer", "fixed-none");
         int removedExit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
                 .execute("optimize", input.toString(), root.resolve("removed.png").toString(), "--optimizer", "baseline");
 
         assertEquals(0, rewrittenExit);
+        assertEquals(0, fixedNoneExit);
         assertEquals(2, removedExit);
     }
 
