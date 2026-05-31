@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 IMAGE_PATTERN = re.compile(r"!\[([^\]]*)\]\((?!data:|https?://)([^)]+\.png)\)")
-INLINE_PATTERN = re.compile(r"(!?\[[^\]]*\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*)")
+INLINE_PATTERN = re.compile(r"(!?\[[^\]]*\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|</?strong>)")
 
 
 @dataclass(frozen=True)
@@ -39,6 +39,10 @@ class Report:
                 continue
             if line.startswith("#"):
                 blocks.append(Block("heading", (line,)))
+                index += 1
+                continue
+            if _is_supported_raw_html(line):
+                blocks.append(Block("raw_html", (line,)))
                 index += 1
                 continue
             if line.startswith("- "):
@@ -91,7 +95,11 @@ def _collect(lines: list[str], index: int, predicate, kind: str, blocks: list[Bl
 
 
 def _starts_block(line: str) -> bool:
-    return line.startswith("#") or line.startswith("- ") or line.startswith("|") or bool(IMAGE_PATTERN.fullmatch(line))
+    return line.startswith("#") or line.startswith("- ") or line.startswith("|") or _is_supported_raw_html(line) or bool(IMAGE_PATTERN.fullmatch(line))
+
+
+def _is_supported_raw_html(line: str) -> bool:
+    return line in {"<details>", "</details>"} or bool(re.fullmatch(r'<summary>[^<]+</summary>|<a id="[A-Za-z0-9._-]+"></a>', line))
 
 
 def _is_table_separator(line: str) -> bool:
@@ -112,6 +120,8 @@ def _render_inline(text: str) -> str:
             rendered.append(f'<a href="{html.escape(href, quote=True)}">{html.escape(label)}</a>')
         elif token.startswith("`"):
             rendered.append(f"<code>{html.escape(token[1:-1])}</code>")
+        elif token in {"<strong>", "</strong>"}:
+            rendered.append(token)
         else:
             rendered.append(f"<strong>{html.escape(token[2:-2])}</strong>")
         position = match.end()
@@ -125,6 +135,8 @@ def _render_block(block: Block) -> str:
         level = min(len(marker), 6)
         heading_id = html.escape(text, quote=True)
         return f'<h{level} id="{heading_id}">{_render_inline(text)}</h{level}>'
+    if block.kind == "raw_html":
+        return block.lines[0]
     if block.kind == "list":
         return "<ul>\n" + "\n".join(f"<li>{_render_inline(line[2:])}</li>" for line in block.lines) + "\n</ul>"
     if block.kind == "table":

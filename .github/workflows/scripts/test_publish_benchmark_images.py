@@ -38,6 +38,15 @@ class PublishBenchmarkReportTest(unittest.TestCase):
         self.assertIn("[View this benchmark report on GitHub Pages](https://example.test/site/run%201/)", rewritten)
         self.assertIn("![](https://example.test/site/run%201/filter-visualizations/icon%20filters.png)", rewritten)
 
+    def test_report_parser_preserves_collapsible_diagnostics_and_strong_winner_cells(self):
+        markdown = '<a id="image-icon.png-abcd1234"></a>\n<details>\n<summary>Diagnostics</summary>\n\n| Strategy | Size |\n|---|---:|\n| <strong>adaptive</strong> | <strong>12</strong> |\n\n</details>\n'
+        report = Report.parse(markdown)
+        rendered = report.render_html("test")
+        self.assertIn('<a id="image-icon.png-abcd1234"></a>', rendered)
+        self.assertIn('<details>', rendered)
+        self.assertIn('<summary>Diagnostics</summary>', rendered)
+        self.assertIn('<td><strong>adaptive</strong></td>', rendered)
+
     def test_report_parser_keeps_paragraphs_structured(self):
         report = Report.parse("## Heading\n\nOne line\ncontinued.\n")
         self.assertEqual(("heading", "paragraph"), tuple(block.kind for block in report.blocks))

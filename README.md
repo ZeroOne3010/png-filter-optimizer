@@ -46,11 +46,7 @@ Pipeline:
 
 ## Benchmark explanations and insights
 
-`benchmark` can attach compression-analysis text to the markdown report:
-
-- `--diagnostics` — render metric tables plus two explanation layers for each image: a concrete `Likely explanation` grounded in residual/LZ/match/filter metrics, followed by a separate `Compression insight` that synthesizes broader PNG/DEFLATE behavior.
-- `--insights` — render only concise compression insights without the full diagnostics tables.
-- `--insights-verbose` — render insight-only output with the detected compression behavior patterns, such as consistency dominance, PAETH-vs-simpler-predictor conflicts, literal row-structure preservation, useful local exceptions, directional coherence, match-quality dominance, and mixed-content behavior.
+`benchmark` always writes the maximal report. The summary table links each image name to a localized image section containing PNG metadata, per-strategy size and timing results, ratios against the winning strategy, filter distributions, compression explanations, verbose insights, collapsible diagnostic tables, and filter-layout previews.
 
 ## Filter layout visualizations
 
@@ -58,13 +54,7 @@ Benchmark reports include a machine-readable `filter_layouts` JSON object for ev
 
 For every non-trivial layout (more than one contiguous filter run), `benchmark` also writes a small palettized PNG preview under `filter-visualizations/` next to the markdown report. The preview is scaled so neither side exceeds 256 pixels by default and tints source rows by filter: `NONE` red, `SUB` orange, `UP` blue, `AVERAGE` green, and `PAETH` purple. Vertical downscaling preserves single-row filter runs whenever the number of runs fits in the reduced height, so isolated filter rows do not disappear just because the preview is smaller.
 
-Useful options:
-
-- `--no-filter-visualizations` — disable preview PNG generation.
-- `--filter-visualization-max-side 256` — change the preview size cap.
-- `--filter-visualization-inline` — embed previews as data URIs in markdown, useful only for markdown renderers that accept data URLs.
-
-The provided benchmark GitHub Action omits filter preview images from the job summary by default because GitHub markdown does not render data URL images reliably there. Set the workflow's `summary_filter_images` input to include inline previews in the job summary. When `sticky_pr_comment` resolves an open PR, the workflow generates non-inline previews capped at 512 pixels per side, publishes them through a GitHub Pages artifact under a path containing the current workflow run ID, and rewrites the PR comment to use the resulting Pages image URLs. Each Pages deployment contains only the current run's image paths, so older PR comments do not accidentally show images from newer runs after a later deployment replaces the site. The repository's Pages source must be configured for GitHub Actions deployments.
+The provided benchmark GitHub Action publishes previews through a GitHub Pages artifact under a path containing the current workflow run ID and rewrites report image references to the resulting Pages URLs. Each Pages deployment contains only the current run's image paths, so older PR comments do not accidentally show images from newer runs after a later deployment replaces the site. The repository's Pages source must be configured for GitHub Actions deployments.
 
 ## Quick examples
 

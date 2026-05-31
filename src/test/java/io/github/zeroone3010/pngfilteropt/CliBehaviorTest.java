@@ -106,14 +106,14 @@ class CliBehaviorTest {
         assertEquals(0, exit);
         String mdText = Files.readString(md);
         String jsonText = Files.readString(jsonPath);
-        assertTrue(mdText.contains("| Image | Original"));
+        assertTrue(mdText.contains("| Image | Best strategy |"));
         assertTrue(mdText.contains("rewritten-baseline"));
         assertTrue(mdText.contains("Best"));
         var json = new ObjectMapper().readTree(jsonText);
         assertTrue(json.has("images"));
         assertTrue(json.get("images").get(0).has("metadata"));
         assertTrue(json.get("images").get(0).has("timings_ms"));
-        assertTrue(mdText.contains("Timing (ms):"));
+        assertTrue(mdText.contains("| Strategy | Size (bytes) | Ratio vs best | NONE | SUB | UP | AVERAGE | PAETH | Time (ms) |"));
     }
     @Test
     void benchmarkDefaultPrintsAdaptiveStrategyLine() throws Exception {
@@ -126,7 +126,7 @@ class CliBehaviorTest {
                 .execute("benchmark", root.toString());
 
         assertEquals(0, exit);
-        assertTrue(out.toString().contains("| Image | Original"));
+        assertTrue(out.toString().contains("| Image | Best strategy |"));
         assertTrue(out.toString().contains("adaptive"));
         assertFalse(out.toString().contains("↳ interpretation"));
     }
@@ -144,8 +144,8 @@ class CliBehaviorTest {
 
         assertEquals(0, exit);
         String text = out.toString();
-        assertTrue(text.contains("| two.png |"));
-        assertFalse(text.contains("| one.png |"));
+        assertTrue(text.contains("| [two.png](#image-two.png-"));
+        assertFalse(text.contains("[one.png](#image-one.png-"));
     }
 
     @Test
@@ -159,7 +159,7 @@ class CliBehaviorTest {
                 .execute("benchmark", "--file", one.toAbsolutePath().toString());
 
         assertEquals(0, exit);
-        assertTrue(out.toString().contains("| " + one.toAbsolutePath() + " |"));
+        assertTrue(out.toString().contains("[" + one.toAbsolutePath() + "](#image-"));
     }
 
 
@@ -182,59 +182,44 @@ class CliBehaviorTest {
     }
 
     @Test
-    void benchmarkDiagnosticsAddsSectionToMarkdownAndJson() throws Exception {
+    void benchmarkAlwaysWritesLocalizedMaximalReport() throws Exception {
         Path root = Files.createTempDirectory("png-bench-diag");
         TestPngFixtures.createPng(root.resolve("one.png"), 2, 2);
         Path md = Files.createTempFile("bench-diag", ".md");
         Path jsonPath = Files.createTempFile("bench-diag", ".json");
 
         int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
-                .execute("benchmark", root.toString(), "--try-all", "--diagnostics", "--diagnostics-lz-sample-step", "2", "--diagnostics-lz-max-candidates", "8", "--markdown", md.toString(), "--json", jsonPath.toString());
+                .execute("benchmark", root.toString(), "--try-all", "--markdown", md.toString(), "--json", jsonPath.toString());
 
         assertEquals(0, exit);
         String mdText = Files.readString(md);
         String jsonText = Files.readString(jsonPath);
-        assertTrue(mdText.contains("## Diagnostics"));
-        assertTrue(mdText.contains("Filter distribution"));
-        assertTrue(mdText.contains("## Directional smoothness"));
-        assertTrue(mdText.contains("## Residual sumAbs"));
+        assertFalse(mdText.contains("### Table of contents"));
+        assertTrue(mdText.contains("| [one.png](#image-one.png-"));
+        assertTrue(mdText.contains("PNG metadata: width=2, height=2"));
+        assertTrue(mdText.contains("| Strategy | Size (bytes) | Ratio vs best | NONE | SUB | UP | AVERAGE | PAETH | Time (ms) |"));
+        assertTrue(mdText.contains("<strong>"));
+        assertTrue(mdText.contains("<details>"));
+        assertTrue(mdText.contains("<summary>Diagnostics</summary>"));
+        assertTrue(mdText.contains("Directional smoothness:"));
+        assertTrue(mdText.contains("Residual sumAbs:"));
         assertTrue(mdText.contains("Likely explanation:"));
         assertTrue(mdText.contains("Compression insight:"));
+        assertTrue(mdText.contains("Patterns detected:"));
         assertTrue(mdText.contains("approximate LZ longest-match estimation"));
         var json = new ObjectMapper().readTree(jsonText);
         assertTrue(json.get("images").get(0).has("diagnostics"));
     }
 
     @Test
-    void benchmarkInsightsAddsConciseInsightSectionWithoutDiagnosticsTables() throws Exception {
-        Path root = Files.createTempDirectory("png-bench-insights");
+    void benchmarkRejectsRemovedReportOutputFlags() throws Exception {
+        Path root = Files.createTempDirectory("png-bench-removed-output-flag");
         TestPngFixtures.createPng(root.resolve("one.png"), 2, 2);
-        Path md = Files.createTempFile("bench-insights", ".md");
 
         int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
-                .execute("benchmark", root.toString(), "--try-all", "--insights", "--markdown", md.toString());
+                .execute("benchmark", root.toString(), "--insights");
 
-        assertEquals(0, exit);
-        String mdText = Files.readString(md);
-        assertTrue(mdText.contains("## Compression insights"));
-        assertTrue(mdText.contains("Compression insight:"));
-        assertFalse(mdText.contains("## Diagnostics"));
-        assertFalse(mdText.contains("Filter distribution"));
-    }
-
-    @Test
-    void benchmarkInsightsVerboseIncludesDetectedPatterns() throws Exception {
-        Path root = Files.createTempDirectory("png-bench-insights-verbose");
-        TestPngFixtures.createPng(root.resolve("one.png"), 2, 2);
-        Path md = Files.createTempFile("bench-insights-verbose", ".md");
-
-        int exit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
-                .execute("benchmark", root.toString(), "--try-all", "--insights-verbose", "--markdown", md.toString());
-
-        assertEquals(0, exit);
-        String mdText = Files.readString(md);
-        assertTrue(mdText.contains("## Compression insights"));
-        assertTrue(mdText.contains("Patterns detected:"));
+        assertEquals(2, exit);
     }
 
 }

@@ -1,24 +1,13 @@
 package io.github.zeroone3010.pngfilteropt.cli;
 
 import org.junit.jupiter.api.Test;
-import picocli.CommandLine;
-
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BenchmarkCommandBestKeyTest {
-    @Test
-    void positiveVisualizationFlagKeepsDefaultEnabledAndNegativeFlagDisablesIt() throws Exception {
-        assertTrue(parseFilterVisualizations("--filter-visualizations"));
-        assertFalse(parseFilterVisualizations("--no-filter-visualizations"));
-    }
-
     @Test
     void demotesGeneticWhenItMatchesFixedFilterSize() throws Exception {
         Map<String, Long> sizes = new LinkedHashMap<>();
@@ -54,14 +43,6 @@ class BenchmarkCommandBestKeyTest {
 
         assertEquals("foo-bar.png--7c48339d--adaptive.filters.png", nested);
         assertEquals("foo-bar.png--c5c812e6--adaptive.filters.png", flattened);
-    }
-
-    private static boolean parseFilterVisualizations(String flag) throws Exception {
-        BenchmarkCommand command = new BenchmarkCommand();
-        new CommandLine(command).parseArgs(flag);
-        Field field = BenchmarkCommand.class.getDeclaredField("filterVisualizations");
-        field.setAccessible(true);
-        return field.getBoolean(command);
     }
 
     private static String invokeBestKey(Map<String, Long> sizes, Map<String, Long> timings) throws Exception {
