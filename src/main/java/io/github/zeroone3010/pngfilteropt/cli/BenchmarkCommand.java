@@ -75,7 +75,7 @@ public final class BenchmarkCommand implements Runnable {
             timingsMs.put("original", 0L);
 
             List<PngFilter> originalFilters = inspector.listFilters(png, raw);
-            FilteredImage rewrittenBaseline = buildBaseline(raw, originalFilters, candidates);
+            FilteredImage rewrittenBaseline = buildRewrittenBaseline(raw, originalFilters, candidates);
             long rewrittenBaselineSize = estimateDeflatedSize(rewrittenBaseline);
             strategies.put("rewritten-baseline", rewrittenBaselineSize);
             timingsMs.put("rewritten-baseline", 0L);
@@ -103,7 +103,7 @@ public final class BenchmarkCommand implements Runnable {
             for (CliOptions.OptimizerName name : selected) {
                 String key = name.name().toLowerCase().replace('_', '-');
                 long t0 = System.nanoTime();
-                FilteredImage optimized = name == CliOptions.OptimizerName.BASELINE ? rewrittenBaseline : optimizers.get(name).optimize(raw, candidates);
+                FilteredImage optimized = name == CliOptions.OptimizerName.REWRITTEN_BASELINE ? rewrittenBaseline : optimizers.get(name).optimize(raw, candidates);
                 timingsMs.put(key, nanosToMillis(System.nanoTime() - t0));
                 strategies.put(key, estimateDeflatedSize(optimized));
                 filterLayouts.put(key, FilterLayout.fromRows(filtersOf(optimized)));
@@ -118,11 +118,14 @@ public final class BenchmarkCommand implements Runnable {
             }
 
             Map<String, Object> filterLayoutJson = toFilterLayoutJson(filterLayouts);
-            Map<String, Map<String, Object>> visualizationJson = writeFilterVisualizations(png, imageLabel(png), filterLayouts, visualizationOutputDirectory());
+            String imageLabel = imageLabel(png);
+            Map<String, Object> sourceImageJson = writeSourceImage(png, imageLabel, sourceImageOutputDirectory());
+            Map<String, Map<String, Object>> visualizationJson = writeFilterVisualizations(png, imageLabel, filterLayouts, visualizationOutputDirectory());
 
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("image", imageLabel(png)); row.put("strategies", strategies); row.put("timings_ms", timingsMs); row.put("best", bestKey(strategies, timingsMs));
+            row.put("image", imageLabel); row.put("strategies", strategies); row.put("timings_ms", timingsMs); row.put("best", bestKey(strategies, timingsMs));
             row.put("metadata", Map.of("width", raw.width(), "height", raw.height(), "bytes_per_pixel", raw.bytesPerPixel(), "bytes_per_row", raw.bytesPerRow(), "original_color_type", raw.colorType(), "rewritten_color_type", raw.colorType(), "original_bit_depth", raw.bitDepth(), "rewritten_bit_depth", raw.bitDepth(), "palette_preserved", raw.paletteRgb() != null, "interlace_preserved", raw.interlaceMethod() == 0 || raw.interlaceMethod() == 1));
+            row.put("source_image", sourceImageJson);
             row.put("filter_layouts", filterLayoutJson);
             if (!visualizationJson.isEmpty()) row.put("filter_visualizations", visualizationJson);
             row.put("diagnostics", strategyDiagnostics);
@@ -169,11 +172,33 @@ public final class BenchmarkCommand implements Runnable {
         return sizes.entrySet().stream()
                 .anyMatch(e -> e.getKey().startsWith("fixed-") && Objects.equals(e.getValue(), geneticSize));
     }
-    private Path visualizationOutputDirectory() {
-        Path base = markdownOutput != null && markdownOutput.getParent() != null
+    private Path reportOutputDirectory() {
+        return markdownOutput != null && markdownOutput.getParent() != null
                 ? markdownOutput.getParent()
                 : Path.of("build", "reports", "pngfilteropt");
-        return base.resolve("filter-visualizations");
+    }
+
+    private Path sourceImageOutputDirectory() {
+        return reportOutputDirectory().resolve("source-images");
+    }
+
+    private Path visualizationOutputDirectory() {
+        return reportOutputDirectory().resolve("filter-visualizations");
+    }
+
+    private Map<String, Object> writeSourceImage(Path png, String imageLabel, Path outputDir) {
+        Path output = outputDir.resolve(sourceImageFileName(imageLabel));
+        try {
+            Files.createDirectories(output.getParent());
+            Files.copy(png, output, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            Map<String, Object> json = new LinkedHashMap<>();
+            json.put("path", output.toString());
+            json.put("markdown_src", markdownVisualizationSource(output));
+            json.put("bytes", Files.size(output));
+            return json;
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to copy source image for report: " + png, e);
+        }
     }
 
     private Map<String, Map<String, Object>> writeFilterVisualizations(Path png, String imageLabel, Map<String, FilterLayout> layouts, Path outputDir) {
@@ -220,6 +245,10 @@ public final class BenchmarkCommand implements Runnable {
         return image.rows().stream().map(FilteredRow::filter).toList();
     }
 
+    private static String sourceImageFileName(String imageLabel) {
+        return sanitizeFileName(imageLabel) + "--" + shortStableHash(imageLabel) + ".source.png";
+    }
+
     private static String visualizationFileName(String imageLabel, String strategy) {
         return sanitizeFileName(imageLabel)
                 + "--"
@@ -254,7 +283,7 @@ public final class BenchmarkCommand implements Runnable {
             return png.toString();
         }
     }
-    private static FilteredImage buildBaseline(RawImage raw, List<PngFilter> inputFilters, CandidateGenerator candidates){ List<FilteredRow> rows=new ArrayList<>(raw.height()); for(int y=0;y<raw.height();y++){PngFilter f=inputFilters.get(y); rows.add(candidates.generateCandidates(raw,y).stream().filter(c->c.filter()==f).findFirst().orElseThrow());} return new FilteredImage(raw, rows);}    
+    private static FilteredImage buildRewrittenBaseline(RawImage raw, List<PngFilter> inputFilters, CandidateGenerator candidates){ List<FilteredRow> rows=new ArrayList<>(raw.height()); for(int y=0;y<raw.height();y++){PngFilter f=inputFilters.get(y); rows.add(candidates.generateCandidates(raw,y).stream().filter(c->c.filter()==f).findFirst().orElseThrow());} return new FilteredImage(raw, rows);}
     private static Path tempDir(){ try{return Files.createTempDirectory("bench-png");}catch(IOException e){throw new IllegalStateException(e);} }
     private static long estimateDeflatedSize(FilteredImage image) { try { ByteArrayOutputStream raw = new ByteArrayOutputStream(); for (var row : image.rows()) { raw.write(row.filter().pngValue()); raw.write(row.filteredBytes()); } ByteArrayOutputStream compressed = new ByteArrayOutputStream(); try (DeflaterOutputStream deflater = new DeflaterOutputStream(compressed)) { deflater.write(raw.toByteArray()); } return compressed.size(); } catch (IOException e) { throw new IllegalStateException(e); } }
     public static List<Path> discoverPngFiles(Path root) { try (Stream<Path> stream = Files.walk(root)) { return stream.filter(Files::isRegularFile).filter(p -> p.getFileName().toString().toLowerCase().endsWith(".png")).sorted().toList(); } catch (IOException e) { throw new IllegalStateException(e); } }
@@ -296,7 +325,7 @@ public final class BenchmarkCommand implements Runnable {
         if(images.isEmpty()) return "| Image | Best strategy |\n|---|---|\n";
 
         StringBuilder sb=new StringBuilder("## Benchmark summary\n\n");
-        sb.append("Original = input PNG size on disk. Rewritten baseline = the same per-row filters rebuilt through this tool and then DEFLATE-estimated; this isolates rewrite/stream effects from filter-choice changes.\n\n");
+        sb.append("Original = input PNG size on disk. `rewritten-baseline` = the same per-row filters rebuilt through this tool and then DEFLATE-estimated; this isolates rewrite/stream effects from filter-choice changes.\n\n");
         sb.append("Compression-case guide: smaller numbers are better, and a gap between `original` and `rewritten-baseline` means the rewritten IDAT stream changed compression behavior even with equivalent row filters.\n\n");
         sb.append("| Image | Best strategy |\n|---|---|\n");
         for(var image:images){
@@ -307,6 +336,11 @@ public final class BenchmarkCommand implements Runnable {
         for(var image:images){
             sb.append("<a id=\"").append(anchor(image.get("image").toString())).append("\"></a>\n");
             sb.append("### ").append(image.get("image")).append("\n\n");
+            @SuppressWarnings("unchecked") Map<String, Object> sourceImage=(Map<String, Object>)image.get("source_image");
+            if(sourceImage!=null){
+                Object src=sourceImage.getOrDefault("markdown_src", sourceImage.get("path"));
+                sb.append("![Source image: ").append(image.get("image")).append("](").append(src).append(")\n\n");
+            }
             appendMetadata(sb, image);
             appendStrategyResults(sb, image);
             diagnosticsRenderer.appendDiagnostics(sb, image, true);

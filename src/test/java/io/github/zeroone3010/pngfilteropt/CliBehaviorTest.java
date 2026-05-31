@@ -113,6 +113,10 @@ class CliBehaviorTest {
         assertTrue(json.has("images"));
         assertTrue(json.get("images").get(0).has("metadata"));
         assertTrue(json.get("images").get(0).has("timings_ms"));
+        var sourceImage = json.get("images").get(0).get("source_image");
+        assertNotNull(sourceImage);
+        assertTrue(Files.isRegularFile(Path.of(sourceImage.get("path").asText())));
+        assertTrue(mdText.contains("![Source image: a/one.png](source-images/"));
         assertTrue(mdText.contains("| Strategy | Size (bytes) | Ratio vs best | NONE | SUB | UP | AVERAGE | PAETH | Time (ms) |"));
     }
     @Test
@@ -209,6 +213,20 @@ class CliBehaviorTest {
         assertTrue(mdText.contains("approximate LZ longest-match estimation"));
         var json = new ObjectMapper().readTree(jsonText);
         assertTrue(json.get("images").get(0).has("diagnostics"));
+    }
+
+    @Test
+    void optimizeAcceptsRewrittenBaselineAndRejectsRemovedBaselineName() throws Exception {
+        Path root = Files.createTempDirectory("png-optimize-rewritten-baseline");
+        Path input = TestPngFixtures.createPng(root.resolve("one.png"), 2, 2);
+
+        int rewrittenExit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .execute("optimize", input.toString(), root.resolve("rewritten.png").toString(), "--optimizer", "rewritten-baseline");
+        int removedExit = new CommandLine(new io.github.zeroone3010.pngfilteropt.Main())
+                .execute("optimize", input.toString(), root.resolve("removed.png").toString(), "--optimizer", "baseline");
+
+        assertEquals(0, rewrittenExit);
+        assertEquals(2, removedExit);
     }
 
     @Test
