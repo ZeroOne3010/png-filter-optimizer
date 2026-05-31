@@ -152,7 +152,7 @@ class CompressionExplanationGeneratorTest {
         d.put("fixed-up", diag(130, 10.0, 0.70, 650, 200, 0, 410, 0.60, usage(PngFilter.UP, 100)));
         d.put("fixed-paeth", diag(120, 8.0, 0.55, 720, 180, 0, 350, 0.60, usage(PngFilter.PAETH, 100)));
         String verbose = generator.compressionInsight("fixed-up", d, true);
-        assertTrue(verbose.contains("directional-coherence") || verbose.contains("directional structure"));
+        assertTrue(verbose.contains("directional measurements") || verbose.contains("directional structure"));
     }
 
     @Test
@@ -161,7 +161,7 @@ class CompressionExplanationGeneratorTest {
         d.put("fixed-sub", diag(180, 10.0, 0.70, 640, 210, 0, 420, 1.05, usage(PngFilter.SUB, 100)));
         d.put("fixed-paeth", diag(175, 8.0, 0.58, 720, 180, 0, 390, 1.05, usage(PngFilter.PAETH, 100)));
         String verbose = generator.compressionInsight("fixed-sub", d, true);
-        assertTrue(verbose.contains("screenshot") || verbose.contains("consistency-dominates"));
+        assertTrue(verbose.contains("mostly uniform predictor strategy"));
     }
 
     @Test
@@ -170,7 +170,7 @@ class CompressionExplanationGeneratorTest {
         d.put("adaptive", diag(80, 5.0, 0.40, 880, 100, 0, 500, 1.0, mixedUsage(25, 25, 20, 15, 15)));
         d.put("fixed-paeth", diag(78, 5.2, 0.42, 900, 110, 0, 480, 1.0, usage(PngFilter.PAETH, 100)));
         String verbose = generator.compressionInsight("adaptive", d, true);
-        assertTrue(verbose.contains("painterly") || verbose.contains("texture-heavy") || verbose.contains("mixed-content"));
+        assertTrue(verbose.contains("different image regions favor different prediction styles"));
     }
 
     @Test
@@ -179,7 +179,23 @@ class CompressionExplanationGeneratorTest {
         d.put("fixed-none", diagWithColor(6, 240, 18.0, 0.80, 620, 260, 10, 460, 1.0, usage(PngFilter.NONE, 100)));
         d.put("fixed-sub", diagWithColor(6, 220, 10.0, 0.65, 700, 190, 0, 420, 1.0, usage(PngFilter.SUB, 100)));
         String verbose = generator.compressionInsight("fixed-none", d, true);
-        assertTrue(verbose.contains("logo/icon") || verbose.contains("alpha-heavy") || verbose.contains("literal-structure-preservation"));
+        assertTrue(verbose.contains("Repeated rows") || verbose.contains("exact repeated row structure"));
+    }
+
+    @Test
+    void verboseInsightRendersObservationsInsteadOfInternalPatternNames() {
+        Map<String, FilteredStreamDiagnostics> d = new LinkedHashMap<>();
+        d.put("fixed-sub", diag(200, 11.0, 0.75, 600, 230, 0, 400, 1.2, usage(PngFilter.SUB, 100)));
+        d.put("fixed-paeth", diag(180, 8.0, 0.55, 720, 180, 0, 150, 1.2, usage(PngFilter.PAETH, 100)));
+
+        String verbose = generator.compressionInsight("fixed-sub", d, true);
+
+        assertTrue(verbose.contains("Compression observations:"));
+        assertTrue(verbose.contains("PAETH minimizes local residuals"));
+        assertFalse(verbose.contains("Patterns detected:"));
+        assertFalse(verbose.contains("simpler-predictors-beat-paeth"));
+        assertFalse(verbose.contains("consistency-dominates"));
+        assertFalse(verbose.contains("image-behavior"));
     }
 
     private static FilteredStreamDiagnostics diag(int repeated32, double avgMatchLen, double shortDistanceShare,

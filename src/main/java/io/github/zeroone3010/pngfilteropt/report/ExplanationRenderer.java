@@ -9,6 +9,7 @@ public final class ExplanationRenderer {
     private static final String DEFAULT_MESSAGE = "Compression outcome reflects a close tradeoff between local predictor precision and global DEFLATE repetition.";
     private static final double SMALL_REPETITION_DELTA = 0.05;
     private static final double LARGE_REPETITION_DELTA = 0.20;
+    private final PatternObservationRenderer observationRenderer = new PatternObservationRenderer();
 
     public String renderMetricExplanation(ExplanationContext context) {
         FilteredStreamDiagnostics winner = context.winner();
@@ -21,19 +22,16 @@ public final class ExplanationRenderer {
     }
 
     public String renderInsight(CompressionInsight insight, boolean verbose) {
-        if (!verbose || insight.patterns().isEmpty()) return insight.summary();
+        if (!verbose) return insight.summary();
+        var observations = observationRenderer.render(insight.patterns());
+        if (observations.isEmpty()) return insight.summary();
+
         StringBuilder sb = new StringBuilder(insight.summary());
-        sb.append(" Patterns detected: ");
-        for (int i = 0; i < insight.patterns().size(); i++) {
-            CompressionPattern p = insight.patterns().get(i);
-            if (i > 0) sb.append("; ");
-            sb.append(p.type().name().toLowerCase(Locale.ROOT).replace('_', '-'))
-                    .append(" (")
-                    .append(intensityPhrase(p.strength()))
-                    .append(")");
+        sb.append("\n\nCompression observations:\n");
+        for (String observation : observations) {
+            sb.append("- ").append(observation).append('\n');
         }
-        sb.append('.');
-        return sb.toString();
+        return sb.toString().stripTrailing();
     }
 
     private String localSentence(String localBest, FilteredStreamDiagnostics winner, String best) {
@@ -145,11 +143,5 @@ public final class ExplanationRenderer {
         if (ratio < -0.20) return "significantly fewer";
         if (ratio < 0.0) return "slightly fewer";
         return "slightly more";
-    }
-
-    private String intensityPhrase(double strength) {
-        if (strength >= 0.85) return "clear evidence";
-        if (strength >= 0.65) return "moderate evidence";
-        return "soft signal";
     }
 }
