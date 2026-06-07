@@ -102,3 +102,6 @@ The provided benchmark GitHub Action publishes source images and previews throug
    A hill-climb pass tries swapping each block to every filter and keeps strictly improving changes until no improvement remains or budget is exhausted.
 
 In short: it explores coarse filter layouts globally with GA operators, uses fast compression as the objective, and spends a fixed scoring budget where it matters most.
+
+---
+✨ Made with vibes ✨
