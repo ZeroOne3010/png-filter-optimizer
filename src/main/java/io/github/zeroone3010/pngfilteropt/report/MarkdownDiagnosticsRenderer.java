@@ -2,7 +2,10 @@ package io.github.zeroone3010.pngfilteropt.report;
 
 import io.github.zeroone3010.pngfilteropt.diagnostics.FilteredStreamDiagnostics;
 
+import java.util.Comparator;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 public final class MarkdownDiagnosticsRenderer {
     private final CompressionExplanationGenerator explanationGenerator = new CompressionExplanationGenerator();
@@ -12,8 +15,9 @@ public final class MarkdownDiagnosticsRenderer {
         if (diagnostics == null || diagnostics.isEmpty()) return;
 
         String best = (String) image.get("best");
-        sb.append("Likely explanation:\n")
-                .append(explanationGenerator.metricExplanation(best, diagnostics))
+        sb.append("Likely explanation:\n");
+        outcomeSummary(image).ifPresent(summary -> sb.append(summary).append('\n'));
+        sb.append(explanationGenerator.metricExplanation(best, diagnostics))
                 .append("\n\nCompression insight:\n")
                 .append(explanationGenerator.compressionInsight(best, diagnostics, verboseInsights))
                 .append("\n\n");
@@ -24,6 +28,51 @@ public final class MarkdownDiagnosticsRenderer {
         appendDirectionalSmoothness(sb, diagnostics.values().iterator().next());
         appendResidualSumAbs(sb, diagnostics.values().iterator().next());
         sb.append("\n</details>\n\n");
+    }
+
+
+    static Optional<String> outcomeSummary(Map<String, Object> image) {
+        Object bestObject = image.get("best");
+        if (!(bestObject instanceof String best) || best.isBlank()) return Optional.empty();
+
+        @SuppressWarnings("unchecked") Map<String, Long> sizes = (Map<String, Long>) image.get("strategies");
+        if (sizes == null || !sizes.containsKey(best)) return Optional.empty();
+
+        long bestSize = sizes.get(best);
+        return comparisonStrategy(sizes, best, bestSize)
+                .map(runner -> formatOutcomeSummary(best, bestSize, runner.getKey(), runner.getValue()));
+    }
+
+    private static Optional<Map.Entry<String, Long>> comparisonStrategy(Map<String, Long> sizes, String best, long bestSize) {
+        return sizes.entrySet().stream()
+                .filter(e -> !e.getKey().startsWith("delta-"))
+                .filter(e -> !e.getKey().equals(best))
+                .filter(e -> !("genetic".equals(e.getKey()) && e.getValue() == bestSize))
+                .min(Comparator.comparingLong(Map.Entry<String, Long>::getValue).thenComparing(Map.Entry::getKey));
+    }
+
+    private static String formatOutcomeSummary(String best, long bestSize, String runner, long runnerSize) {
+        long byteMargin = runnerSize - bestSize;
+        if (byteMargin == 0) {
+            return "Winning strategy: `" + best + "` tied `" + runner + "` at " + formatNumber(bestSize) + " bytes after ignoring same-size genetic duplicates.";
+        }
+
+        double percentSmaller = runnerSize <= 0 ? 0.0 : 100.0 * byteMargin / runnerSize;
+        String sizeLabel = marginLabel(percentSmaller);
+        String direction = byteMargin > 0 ? "beat" : "trailed";
+        long absoluteMargin = Math.abs(byteMargin);
+        double absolutePercent = Math.abs(percentSmaller);
+        return String.format(Locale.ROOT,
+                "Winning strategy: `%s` %s `%s` by a %s margin of %s bytes (%.2f%% smaller).",
+                best, direction, runner, sizeLabel, formatNumber(absoluteMargin), absolutePercent);
+    }
+
+    private static String marginLabel(double percentSmaller) {
+        double absolute = Math.abs(percentSmaller);
+        if (absolute < 1.0) return "tiny";
+        if (absolute < 3.0) return "small";
+        if (absolute < 8.0) return "moderate";
+        return "large";
     }
 
     private void appendLzTable(StringBuilder sb, Map<String, FilteredStreamDiagnostics> diagnostics) {
