@@ -15,8 +15,8 @@ public final class MarkdownDiagnosticsRenderer {
         if (diagnostics == null || diagnostics.isEmpty()) return;
 
         String best = (String) image.get("best");
+        outcomeSummary(image).ifPresent(summary -> sb.append(summary).append("\n\n"));
         sb.append("Likely explanation:\n");
-        outcomeSummary(image).ifPresent(summary -> sb.append(summary).append('\n'));
         sb.append(explanationGenerator.metricExplanation(best, diagnostics))
                 .append("\n\nCompression insight:\n")
                 .append(explanationGenerator.compressionInsight(best, diagnostics, verboseInsights))
