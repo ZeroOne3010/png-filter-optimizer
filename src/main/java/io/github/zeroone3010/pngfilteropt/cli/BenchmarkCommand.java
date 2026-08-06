@@ -203,7 +203,7 @@ public final class BenchmarkCommand implements Runnable {
 
     private Map<String, Map<String, Object>> writeFilterVisualizations(Path png, String imageLabel, Map<String, FilterLayout> layouts, Path outputDir) {
         Map<String, Map<String, Object>> visualizations = new LinkedHashMap<>();
-        var writer = new FilterVisualizationWriter(FilterVisualizationWriter.DEFAULT_MAX_SIDE);
+        var writer = new FilterVisualizationWriter();
         for (var e : layouts.entrySet()) {
             if (e.getValue().isTrivial()) continue;
             String fileName = visualizationFileName(imageLabel, e.getKey());
