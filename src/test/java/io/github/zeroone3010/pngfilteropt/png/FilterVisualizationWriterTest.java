@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.awt.image.IndexColorModel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -32,7 +33,7 @@ class FilterVisualizationWriterTest {
     }
 
     @Test
-    void writesPalettizedScaledPreviewForNonContiguousRows() throws Exception {
+    void writesPalettizedVisualizationAtOriginalSizeForNonContiguousRows() throws Exception {
         Path input = Files.createTempFile("filter-preview", ".png");
         BufferedImage source = new BufferedImage(12, 12, BufferedImage.TYPE_INT_RGB);
         for (int y = 0; y < source.getHeight(); y++) {
@@ -49,15 +50,16 @@ class FilterVisualizationWriterTest {
         FilterLayout layout = FilterLayout.fromRows(filters);
         Path output = Files.createTempFile("filter-preview-out", ".png");
 
-        FilterVisualizationWriter.Visualization visualization = new FilterVisualizationWriter(8).write(input, layout, output);
+        FilterVisualizationWriter.Visualization visualization = new FilterVisualizationWriter().write(input, layout, output);
 
         assertTrue(Files.size(output) > 0);
         assertEquals(Files.size(output), visualization.bytes());
-        assertTrue(visualization.dataUri().startsWith("data:image/png;base64,"));
         BufferedImage preview = ImageIO.read(output.toFile());
         assertNotNull(preview);
-        assertTrue(preview.getWidth() <= 8);
-        assertTrue(preview.getHeight() <= 8);
+        assertEquals(source.getWidth(), preview.getWidth());
+        assertEquals(source.getHeight(), preview.getHeight());
         assertEquals(BufferedImage.TYPE_BYTE_INDEXED, preview.getType());
+        IndexColorModel colorModel = assertInstanceOf(IndexColorModel.class, preview.getColorModel());
+        assertEquals(256, colorModel.getMapSize());
     }
 }
