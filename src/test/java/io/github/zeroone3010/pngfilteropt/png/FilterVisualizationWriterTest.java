@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.awt.image.IndexColorModel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -59,6 +60,7 @@ class FilterVisualizationWriterTest {
         assertEquals(source.getWidth(), preview.getWidth());
         assertEquals(source.getHeight(), preview.getHeight());
         assertEquals(BufferedImage.TYPE_BYTE_INDEXED, preview.getType());
-        assertEquals(256, preview.getColorModel().getMapSize());
+        IndexColorModel colorModel = assertInstanceOf(IndexColorModel.class, preview.getColorModel());
+        assertEquals(256, colorModel.getMapSize());
     }
 }
