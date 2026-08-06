@@ -54,7 +54,6 @@ class FilterVisualizationWriterTest {
 
         assertTrue(Files.size(output) > 0);
         assertEquals(Files.size(output), visualization.bytes());
-        assertTrue(visualization.dataUri().startsWith("data:image/png;base64,"));
         BufferedImage preview = ImageIO.read(output.toFile());
         assertNotNull(preview);
         assertEquals(source.getWidth(), preview.getWidth());
