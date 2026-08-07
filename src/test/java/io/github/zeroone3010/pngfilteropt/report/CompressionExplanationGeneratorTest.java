@@ -198,6 +198,29 @@ class CompressionExplanationGeneratorTest {
         assertFalse(verbose.contains("image-behavior"));
     }
 
+    @Test
+    void equivalentGeneticWinnerIsAcknowledgedAndSkippedForComparison() {
+        Map<String, FilteredStreamDiagnostics> d = new LinkedHashMap<>();
+        d.put("fixed-up", fingerprint(diag(100, 10, .8, 600, 200, 0, 300, .7, usage(PngFilter.UP, 100)), "same"));
+        d.put("genetic", fingerprint(diag(100, 10, .8, 600, 200, 0, 300, .7, usage(PngFilter.UP, 100)), "same"));
+        d.put("entropy", fingerprint(diag(80, 8, .5, 800, 150, 0, 300, .7, mixedUsage(0, 50, 0, 50, 0)), "different"));
+
+        String text = generator.metricExplanation("fixed-up", d, Map.of("fixed-up", 900L, "genetic", 900L, "entropy", 1000L));
+
+        assertTrue(text.contains("genetic search converged to the same filter sequence as fixed-up"));
+        assertFalse(text.contains("100 vs 100"));
+        assertTrue(new ExplanationContext("fixed-up", d, Map.of("fixed-up", 900L, "genetic", 900L, "entropy", 1000L))
+                .finalSizeRunnerUp().orElseThrow().getKey().equals("entropy"));
+    }
+
+    private static FilteredStreamDiagnostics fingerprint(FilteredStreamDiagnostics d, String fingerprint) {
+        return new FilteredStreamDiagnostics(d.width(), d.height(), d.colorType(), d.bitDepth(), d.bytesPerPixel(),
+                d.bytesPerRow(), d.streamLength(), d.entropy(), d.zeroByteCount(), d.zeroPercentage(),
+                d.distinctByteValues(), d.longestIdenticalRun(), d.repeatedFullRowCount(), d.rowsEqualToPrevious(),
+                d.mostCommonRowHashCount(), d.filterUsage(), d.repetitionMetrics(), d.lzParseDiagnostics(),
+                d.directionalSmoothness(), d.residualDiagnostics(), fingerprint);
+    }
+
     private static FilteredStreamDiagnostics diag(int repeated32, double avgMatchLen, double shortDistanceShare,
                                                   long lzCost, int longestMatch, int rowsEqualPrev, long paethResidual,
                                                   double ratio, FilterUsage usage) {

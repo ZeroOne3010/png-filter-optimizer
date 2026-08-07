@@ -77,6 +77,21 @@ class MarkdownDiagnosticsRendererTest {
         assertTrue(summary.contains("moderate margin of 60 bytes (5.66% smaller)"));
     }
 
+    @Test
+    void diagnosticsExposeEveryMetricCitedByExplanations() {
+        Map<String, Object> image = new LinkedHashMap<>();
+        image.put("best", "fixed-paeth");
+        image.put("strategies", Map.of("fixed-paeth", 10L));
+        image.put("diagnostics", Map.of("fixed-paeth", diagnostics()));
+        StringBuilder rendered = new StringBuilder();
+        new MarkdownDiagnosticsRenderer().appendDiagnostics(rendered, image, false);
+        assertTrue(rendered.toString().contains("Repeated 32B"));
+        assertTrue(rendered.toString().contains("Repeated rows"));
+        assertTrue(rendered.toString().contains("LZ cost bits"));
+        assertTrue(rendered.toString().contains("Avg match len"));
+        assertTrue(rendered.toString().contains("Short dist %"));
+    }
+
     private static FilteredStreamDiagnostics diagnostics() {
         EnumMap<PngFilter, Integer> counts = new EnumMap<>(PngFilter.class);
         for (PngFilter filter : PngFilter.values()) counts.put(filter, 0);

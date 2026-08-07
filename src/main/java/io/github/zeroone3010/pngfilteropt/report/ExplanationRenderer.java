@@ -16,9 +16,10 @@ public final class ExplanationRenderer {
         if (winner == null) return DEFAULT_MESSAGE;
         String localBest = context.localBestFilter();
         String local = localSentence(localBest, winner, context.best());
+        String equivalence = equivalenceSentence(context);
         String global = globalSentence(context.best(), localBest, winner, context);
         String deflate = deflateSentence(context.best(), localBest, winner, context);
-        return String.join(" ", local, global, deflate).trim();
+        return String.join(" ", local, equivalence, global, deflate).replaceAll(" +", " ").trim();
     }
 
     public String renderInsight(CompressionInsight insight, boolean verbose) {
@@ -61,7 +62,7 @@ public final class ExplanationRenderer {
             return "However, fixed-none preserves literal row structure with " + winner.rowsEqualToPrevious() + " repeated rows, reinforcing exact repeated byte runs for DEFLATE back-references.";
         }
 
-        FilteredStreamDiagnostics runner = context.runnerUpByLzCost().map(java.util.Map.Entry::getValue).orElse(null);
+        FilteredStreamDiagnostics runner = context.finalSizeRunnerUp().map(java.util.Map.Entry::getValue).orElse(null);
         if (runner == null) {
             return "However, " + best + " wins on global stream structure rather than a single dominant local metric.";
         }
@@ -92,8 +93,17 @@ public final class ExplanationRenderer {
             return "Although alternatives show substantially more repeated 32-byte substrings, " + best + " still achieves lower estimated LZ token cost, suggesting better match quality and token efficiency.";
         }
 
-        return "However, " + best + " produces " + intensityWord(winnerRep32, runnerRep32) + " repeated DEFLATE-friendly 32-byte substrings ("
-                + winnerRep32 + " vs " + runnerRep32 + "), strengthening global repeat structure.";
+        String comparison = MetricComparison.describe(winnerRep32, runnerRep32);
+        if ("equal".equals(comparison)) {
+            if (betterCost) return "The strategies have equal repeated 32-byte substring counts, while " + best + " has lower estimated LZ token cost.";
+            return best + " wins despite equal repeated 32-byte substring counts; raw repetition volume does not explain the result.";
+        }
+        if (comparison.contains("same") || comparison.contains("similar")) {
+            return "Repetition metrics are " + comparison + " (" + winnerRep32 + " vs " + runnerRep32
+                    + " repeated 32-byte substrings); match quality is more informative than this tiny difference.";
+        }
+        return "However, " + best + " produces " + comparison + " repeated DEFLATE-friendly 32-byte substrings ("
+                + winnerRep32 + " vs " + runnerRep32 + "), affecting global repeat structure.";
     }
 
     private String deflateSentence(String best, String localBest, FilteredStreamDiagnostics winner, ExplanationContext context) {
@@ -134,14 +144,15 @@ public final class ExplanationRenderer {
         return (winner - runner) / (double) runner;
     }
 
-    private String intensityWord(int winner, int runner) {
-        if (winner <= 0 && runner <= 0) return "comparable";
-        if (runner <= 0) return "dramatically more";
-        double ratio = (winner - runner) / (double) runner;
-        if (ratio > 0.50) return "dramatically more";
-        if (ratio > 0.20) return "substantially more";
-        if (ratio < -0.20) return "significantly fewer";
-        if (ratio < 0.0) return "slightly fewer";
-        return "slightly more";
+    private String equivalenceSentence(ExplanationContext context) {
+        return context.equivalentStrategies().stream().map(java.util.Map.Entry::getKey)
+                .filter(name -> "genetic".equals(name) || context.best().equals("genetic"))
+                .findFirst()
+                .map(name -> {
+                    String genetic = "genetic".equals(name) ? name : context.best();
+                    String fixed = "genetic".equals(name) ? context.best() : name;
+                    return "The " + genetic + " search converged to the same filter sequence as " + fixed
+                            + ", independently rediscovering the identical filtered stream.";
+                }).orElse("");
     }
 }

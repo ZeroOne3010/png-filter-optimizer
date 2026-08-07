@@ -9,7 +9,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
-public record ExplanationContext(String best, Map<String, FilteredStreamDiagnostics> diagnostics) {
+public record ExplanationContext(String best, Map<String, FilteredStreamDiagnostics> diagnostics, Map<String, Long> finalSizes) {
+    public ExplanationContext(String best, Map<String, FilteredStreamDiagnostics> diagnostics) {
+        this(best, diagnostics, Map.of());
+    }
     public java.util.List<MetricObservation> metricObservations() {
         FilteredStreamDiagnostics winner = winner();
         if (winner == null) return java.util.List.of();
@@ -32,8 +35,39 @@ public record ExplanationContext(String best, Map<String, FilteredStreamDiagnost
 
     public Optional<Map.Entry<String, FilteredStreamDiagnostics>> runnerUpByLzCost() {
         return diagnostics.entrySet().stream()
-                .filter(e -> !e.getKey().equals(best))
+                .filter(this::isDistinctCandidate)
                 .min(Comparator.comparingLong(e -> e.getValue().lzParseDiagnostics().approximateLzCostBits()));
+    }
+
+    public Optional<Map.Entry<String, FilteredStreamDiagnostics>> finalSizeRunnerUp() {
+        if (finalSizes.isEmpty()) return runnerUpByLzCost();
+        return diagnostics.entrySet().stream()
+                .filter(this::isDistinctCandidate)
+                .filter(e -> finalSizes.containsKey(e.getKey()))
+                .min(Comparator.comparingLong(e -> finalSizes.get(e.getKey())));
+    }
+
+    public Optional<Map.Entry<String, FilteredStreamDiagnostics>> bestFixedStrategy() {
+        return diagnostics.entrySet().stream().filter(this::isDistinctCandidate)
+                .filter(e -> e.getKey().startsWith("fixed-"))
+                .min(Comparator.comparingLong(e -> finalSizes.getOrDefault(e.getKey(),
+                        e.getValue().lzParseDiagnostics().approximateLzCostBits())));
+    }
+
+    public java.util.List<Map.Entry<String, FilteredStreamDiagnostics>> equivalentStrategies() {
+        FilteredStreamDiagnostics winner = winner();
+        if (winner == null) return java.util.List.of();
+        return diagnostics.entrySet().stream().filter(e -> !e.getKey().equals(best))
+                .filter(e -> winner.isFilterEquivalentTo(e.getValue())).toList();
+    }
+
+    private boolean isDistinctCandidate(Map.Entry<String, FilteredStreamDiagnostics> entry) {
+        if (entry.getKey().equals(best) || winner() == null || winner().isFilterEquivalentTo(entry.getValue())) return false;
+        FilteredStreamDiagnostics candidate = entry.getValue();
+        return winner().lzParseDiagnostics().approximateLzCostBits() != candidate.lzParseDiagnostics().approximateLzCostBits()
+                || Double.compare(winner().lzParseDiagnostics().averageMatchLength(), candidate.lzParseDiagnostics().averageMatchLength()) != 0
+                || winner().repetitionMetrics().repeated32ByteSubstrings() != candidate.repetitionMetrics().repeated32ByteSubstrings()
+                || !winner().filterUsage().counts().equals(candidate.filterUsage().counts());
     }
 
     public String localBestFilter() {
