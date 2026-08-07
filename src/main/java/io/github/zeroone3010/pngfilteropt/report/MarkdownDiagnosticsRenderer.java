@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 
 public final class MarkdownDiagnosticsRenderer {
     private final CompressionExplanationGenerator explanationGenerator = new CompressionExplanationGenerator();
@@ -17,10 +18,13 @@ public final class MarkdownDiagnosticsRenderer {
         String best = (String) image.get("best");
         outcomeSummary(image).ifPresent(summary -> sb.append(summary).append("\n\n"));
         sb.append("Likely explanation:\n");
-        sb.append(explanationGenerator.metricExplanation(best, diagnostics))
+        @SuppressWarnings("unchecked") Map<String, Long> sizes = (Map<String, Long>) image.getOrDefault("strategies", Map.of());
+        sb.append(explanationGenerator.metricExplanation(best, diagnostics, sizes))
                 .append("\n\nCompression insight:\n")
-                .append(explanationGenerator.compressionInsight(best, diagnostics, verboseInsights))
+                .append(explanationGenerator.compressionInsight(best, diagnostics, sizes, verboseInsights))
                 .append("\n\n");
+
+        appendEquivalences(sb, best, diagnostics);
 
         sb.append("<details>\n<summary>Diagnostics</summary>\n\n");
         sb.append("_Note: diagnostics include approximate LZ longest-match estimation (sampled hash-chain over 32 KiB lookback)._\n\n");
@@ -39,15 +43,21 @@ public final class MarkdownDiagnosticsRenderer {
         if (sizes == null || !sizes.containsKey(best)) return Optional.empty();
 
         long bestSize = sizes.get(best);
-        return comparisonStrategy(sizes, best, bestSize)
+        @SuppressWarnings("unchecked") Map<String, FilteredStreamDiagnostics> diagnostics =
+                (Map<String, FilteredStreamDiagnostics>) image.getOrDefault("diagnostics", Map.of());
+        return comparisonStrategy(sizes, diagnostics, best)
                 .map(runner -> formatOutcomeSummary(best, bestSize, runner.getKey(), runner.getValue()));
     }
 
-    private static Optional<Map.Entry<String, Long>> comparisonStrategy(Map<String, Long> sizes, String best, long bestSize) {
+    private static Optional<Map.Entry<String, Long>> comparisonStrategy(Map<String, Long> sizes,
+                                                                         Map<String, FilteredStreamDiagnostics> diagnostics,
+                                                                         String best) {
+        FilteredStreamDiagnostics winner = diagnostics.get(best);
         return sizes.entrySet().stream()
                 .filter(e -> !e.getKey().startsWith("delta-"))
                 .filter(e -> !e.getKey().equals(best))
-                .filter(e -> !("genetic".equals(e.getKey()) && e.getValue() == bestSize))
+                .filter(e -> winner == null || !winner.isFilterEquivalentTo(diagnostics.get(e.getKey())))
+                .filter(e -> winner != null || !("genetic".equals(e.getKey()) && Objects.equals(e.getValue(), sizes.get(best))))
                 .min(Comparator.comparingLong(Map.Entry<String, Long>::getValue).thenComparing(Map.Entry::getKey));
     }
 
@@ -76,14 +86,25 @@ public final class MarkdownDiagnosticsRenderer {
     }
 
     private void appendLzTable(StringBuilder sb, Map<String, FilteredStreamDiagnostics> diagnostics) {
-        sb.append("| Strategy | LZ cost bits | Match coverage % | Avg match len | Matches 64+ | Short dist % | Long dist % |\n|---|---:|---:|---:|---:|---:|---:|\n");
+        sb.append("| Strategy | LZ cost bits | Match coverage % | Avg match len | Matches 64+ | Repeated 32B | Repeated rows | Short dist % | Long dist % |\n|---|---:|---:|---:|---:|---:|---:|---:|---:|\n");
         for (var e : diagnostics.entrySet()) {
             var lz = e.getValue().lzParseDiagnostics();
             long matches64 = lz.matchLengthBuckets()[4] + lz.matchLengthBuckets()[5];
             long distTotal = java.util.Arrays.stream(lz.matchDistanceBuckets()).sum();
             double shortPct = distTotal == 0 ? 0 : (100.0 * lz.matchDistanceBuckets()[0] / distTotal);
             double longPct = distTotal == 0 ? 0 : (100.0 * lz.matchDistanceBuckets()[4] / distTotal);
-            sb.append("| ").append(e.getKey()).append(" | ").append(formatNumber(lz.approximateLzCostBits())).append(" | ").append(String.format("%.1f", lz.matchCoveragePercent())).append(" | ").append(String.format("%.1f", lz.averageMatchLength())).append(" | ").append(matches64).append(" | ").append(String.format("%.1f", shortPct)).append(" | ").append(String.format("%.1f", longPct)).append(" |\n");
+            sb.append("| ").append(e.getKey()).append(" | ").append(formatNumber(lz.approximateLzCostBits())).append(" | ").append(String.format("%.1f", lz.matchCoveragePercent())).append(" | ").append(String.format("%.1f", lz.averageMatchLength())).append(" | ").append(matches64).append(" | ").append(formatNumber(e.getValue().repetitionMetrics().repeated32ByteSubstrings())).append(" | ").append(formatNumber(e.getValue().rowsEqualToPrevious())).append(" | ").append(String.format("%.1f", shortPct)).append(" | ").append(String.format("%.1f", longPct)).append(" |\n");
+        }
+    }
+
+    private void appendEquivalences(StringBuilder sb, String best, Map<String, FilteredStreamDiagnostics> diagnostics) {
+        FilteredStreamDiagnostics winner = diagnostics.get(best);
+        if (winner == null) return;
+        var aliases = diagnostics.entrySet().stream().filter(e -> !e.getKey().equals(best))
+                .filter(e -> winner.isFilterEquivalentTo(e.getValue())).map(Map.Entry::getKey).toList();
+        if (!aliases.isEmpty()) {
+            sb.append("Equivalent strategies: ").append(String.join(", ", aliases)).append(" ≡ ").append(best)
+                    .append(" (identical filtered stream; runtime rows retained).\n\n");
         }
     }
 

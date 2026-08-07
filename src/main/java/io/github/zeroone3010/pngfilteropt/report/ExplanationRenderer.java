@@ -4,6 +4,7 @@ import io.github.zeroone3010.pngfilteropt.diagnostics.FilteredStreamDiagnostics;
 import io.github.zeroone3010.pngfilteropt.diagnostics.LzParseDiagnostics;
 
 import java.util.Locale;
+import java.util.Map;
 
 public final class ExplanationRenderer {
     private static final String DEFAULT_MESSAGE = "Compression outcome reflects a close tradeoff between local predictor precision and global DEFLATE repetition.";
@@ -16,9 +17,11 @@ public final class ExplanationRenderer {
         if (winner == null) return DEFAULT_MESSAGE;
         String localBest = context.localBestFilter();
         String local = localSentence(localBest, winner, context.best());
-        String global = globalSentence(context.best(), localBest, winner, context);
-        String deflate = deflateSentence(context.best(), localBest, winner, context);
-        return String.join(" ", local, global, deflate).trim();
+        String equivalence = equivalenceSentence(context);
+        Map.Entry<String, FilteredStreamDiagnostics> comparison = context.finalSizeRunnerUp().orElse(null);
+        String global = globalSentence(context.best(), localBest, winner, context, comparison);
+        String deflate = deflateSentence(context.best(), localBest, winner, context, comparison);
+        return String.join(" ", local, equivalence, global, deflate).replaceAll(" +", " ").trim();
     }
 
     public String renderInsight(CompressionInsight insight, boolean verbose) {
@@ -56,12 +59,14 @@ public final class ExplanationRenderer {
         return " Directional smoothness is balanced across axes.";
     }
 
-    private String globalSentence(String best, String localBest, FilteredStreamDiagnostics winner, ExplanationContext context) {
+    private String globalSentence(String best, String localBest, FilteredStreamDiagnostics winner,
+                                  ExplanationContext context,
+                                  Map.Entry<String, FilteredStreamDiagnostics> comparison) {
         if ("fixed-none".equals(best) && winner.rowsEqualToPrevious() > 0) {
             return "However, fixed-none preserves literal row structure with " + winner.rowsEqualToPrevious() + " repeated rows, reinforcing exact repeated byte runs for DEFLATE back-references.";
         }
 
-        FilteredStreamDiagnostics runner = context.runnerUpByLzCost().map(java.util.Map.Entry::getValue).orElse(null);
+        FilteredStreamDiagnostics runner = comparison == null ? null : comparison.getValue();
         if (runner == null) {
             return "However, " + best + " wins on global stream structure rather than a single dominant local metric.";
         }
@@ -79,25 +84,36 @@ public final class ExplanationRenderer {
 
         if (Math.abs(repDelta) < SMALL_REPETITION_DELTA && betterCost && betterLength && betterDistance) {
             return String.format(Locale.ROOT,
-                    "Repetition metrics are broadly similar (%d vs %d repeated 32-byte substrings), but %s has lower estimated LZ token cost, longer average matches, and more short-distance matches, indicating a simpler and more stationary residual stream.",
-                    winnerRep32, runnerRep32, best);
+                    "Compared with %s, the global repetition evidence is close. Repetition metrics are broadly similar (%d vs %d repeated 32-byte substrings), but %s has lower estimated LZ token cost, longer average matches, and more short-distance matches, indicating a simpler and more stationary residual stream.",
+                    comparison.getKey(), winnerRep32, runnerRep32, best);
         }
         if (Math.abs(repDelta) < SMALL_REPETITION_DELTA && (betterCost || betterLength || betterDistance)) {
             return String.format(Locale.ROOT,
-                    "Repetition metrics are broadly similar (%d vs %d repeated 32-byte substrings), and match quality differs more than raw repetition count; %s shows the stronger local match structure overall.",
-                    winnerRep32, runnerRep32, best);
+                    "Compared with %s, the global repetition evidence is close. Repetition metrics are broadly similar (%d vs %d repeated 32-byte substrings), and match quality differs more than raw repetition count; %s shows the stronger local match structure overall.",
+                    comparison.getKey(), winnerRep32, runnerRep32, best);
         }
 
         if (repDelta <= -LARGE_REPETITION_DELTA && betterCost) {
-            return "Although alternatives show substantially more repeated 32-byte substrings, " + best + " still achieves lower estimated LZ token cost, suggesting better match quality and token efficiency.";
+            return "Although " + comparison.getKey() + " shows substantially more repeated 32-byte substrings, " + best + " still achieves lower estimated LZ token cost, suggesting better match quality and token efficiency.";
         }
 
-        return "However, " + best + " produces " + intensityWord(winnerRep32, runnerRep32) + " repeated DEFLATE-friendly 32-byte substrings ("
-                + winnerRep32 + " vs " + runnerRep32 + "), strengthening global repeat structure.";
+        String comparisonWording = MetricComparison.describe(winnerRep32, runnerRep32);
+        if ("equal".equals(comparisonWording)) {
+            if (betterCost) return best + " and " + comparison.getKey() + " have equal repeated 32-byte substring counts, while " + best + " has lower estimated LZ token cost.";
+            return best + " wins over " + comparison.getKey() + " despite equal repeated 32-byte substring counts; raw repetition volume does not explain the result.";
+        }
+        if (comparisonWording.contains("same") || comparisonWording.contains("similar")) {
+            return "Compared with " + comparison.getKey() + ", repetition metrics are " + comparisonWording + " (" + winnerRep32 + " vs " + runnerRep32
+                    + " repeated 32-byte substrings); match quality is more informative than this tiny difference.";
+        }
+        return "Compared with " + comparison.getKey() + ", " + best + " produces " + comparisonWording + " repeated DEFLATE-friendly 32-byte substrings ("
+                + winnerRep32 + " vs " + runnerRep32 + "), affecting global repeat structure.";
     }
 
-    private String deflateSentence(String best, String localBest, FilteredStreamDiagnostics winner, ExplanationContext context) {
-        FilteredStreamDiagnostics runner = context.runnerUpByLzCost().map(java.util.Map.Entry::getValue).orElse(null);
+    private String deflateSentence(String best, String localBest, FilteredStreamDiagnostics winner,
+                                   ExplanationContext context,
+                                   Map.Entry<String, FilteredStreamDiagnostics> comparison) {
+        FilteredStreamDiagnostics runner = comparison == null ? null : comparison.getValue();
         boolean localConflict = !best.toUpperCase(Locale.ROOT).contains(localBest);
 
         if (runner == null) return DEFAULT_MESSAGE;
@@ -114,7 +130,8 @@ public final class ExplanationRenderer {
 
         if (localConflict && "PAETH".equals(localBest)
                 && winnerLz.approximateLzCostBits() < runnerLz.approximateLzCostBits()) {
-            return "Although PAETH slightly minimizes residual magnitude better, " + best + " generates a more compression-friendly residual stream with better match lengths, nearer references, and lower estimated LZ token cost.";
+            return "Although PAETH slightly minimizes residual magnitude better, compared with " + comparison.getKey() + ", "
+                    + best + " generates a more compression-friendly residual stream with better match lengths, nearer references, and lower estimated LZ token cost.";
         }
 
         if ("fixed-paeth".equals(best) || "paeth".equals(best)) {
@@ -134,14 +151,15 @@ public final class ExplanationRenderer {
         return (winner - runner) / (double) runner;
     }
 
-    private String intensityWord(int winner, int runner) {
-        if (winner <= 0 && runner <= 0) return "comparable";
-        if (runner <= 0) return "dramatically more";
-        double ratio = (winner - runner) / (double) runner;
-        if (ratio > 0.50) return "dramatically more";
-        if (ratio > 0.20) return "substantially more";
-        if (ratio < -0.20) return "significantly fewer";
-        if (ratio < 0.0) return "slightly fewer";
-        return "slightly more";
+    private String equivalenceSentence(ExplanationContext context) {
+        return context.equivalentStrategies().stream().map(java.util.Map.Entry::getKey)
+                .filter(name -> "genetic".equals(name) || context.best().equals("genetic"))
+                .findFirst()
+                .map(name -> {
+                    String genetic = "genetic".equals(name) ? name : context.best();
+                    String fixed = "genetic".equals(name) ? context.best() : name;
+                    return "The " + genetic + " search converged to the same filter sequence as " + fixed
+                            + ", independently rediscovering the identical filtered stream.";
+                }).orElse("");
     }
 }

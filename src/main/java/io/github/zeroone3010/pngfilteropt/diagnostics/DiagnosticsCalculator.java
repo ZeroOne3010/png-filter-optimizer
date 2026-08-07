@@ -13,6 +13,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 public final class DiagnosticsCalculator {
     private final DirectionalityAnalyzer directionalityAnalyzer = new DirectionalityAnalyzer();
@@ -74,8 +76,16 @@ public final class DiagnosticsCalculator {
                 src.width(), src.height(), src.colorType(), src.bitDepth(), src.bytesPerPixel(), src.bytesPerRow(),
                 stream.length, entropy, zeros, stream.length == 0 ? 0d : (100.0 * zeros / stream.length),
                 distinct, longestRun, repeatedFullRowCount, rowsEqualToPrevious, mostCommonRowHash,
-                filterUsage, rep, lz, directional, residual
+                filterUsage, rep, lz, directional, residual, sha256(stream)
         );
+    }
+
+    private String sha256(byte[] stream) {
+        try {
+            return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(stream));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 digest unavailable", e);
+        }
     }
 
     public byte[] toDeflateInputStream(FilteredImage image) {

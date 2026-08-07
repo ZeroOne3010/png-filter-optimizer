@@ -16,12 +16,22 @@ public final class CompressionExplanationGenerator {
         return renderer.renderMetricExplanation(new ExplanationContext(best, diagnostics));
     }
 
+    public String metricExplanation(String best, Map<String, FilteredStreamDiagnostics> diagnostics, Map<String, Long> sizes) {
+        return renderer.renderMetricExplanation(new ExplanationContext(best, diagnostics, sizes));
+    }
+
     public String compressionInsight(String best, Map<String, FilteredStreamDiagnostics> diagnostics) {
         return compressionInsight(best, diagnostics, false);
     }
 
     public String compressionInsight(String best, Map<String, FilteredStreamDiagnostics> diagnostics, boolean verbose) {
         ExplanationContext context = new ExplanationContext(best, diagnostics);
+        return renderer.renderInsight(insightSynthesizer.synthesize(context), verbose);
+    }
+
+    public String compressionInsight(String best, Map<String, FilteredStreamDiagnostics> diagnostics,
+                                     Map<String, Long> sizes, boolean verbose) {
+        ExplanationContext context = new ExplanationContext(best, diagnostics, sizes);
         return renderer.renderInsight(insightSynthesizer.synthesize(context), verbose);
     }
 
