@@ -62,12 +62,11 @@ public record ExplanationContext(String best, Map<String, FilteredStreamDiagnost
     }
 
     private boolean isDistinctCandidate(Map.Entry<String, FilteredStreamDiagnostics> entry) {
-        if (entry.getKey().equals(best) || winner() == null || winner().isFilterEquivalentTo(entry.getValue())) return false;
-        FilteredStreamDiagnostics candidate = entry.getValue();
-        return winner().lzParseDiagnostics().approximateLzCostBits() != candidate.lzParseDiagnostics().approximateLzCostBits()
-                || Double.compare(winner().lzParseDiagnostics().averageMatchLength(), candidate.lzParseDiagnostics().averageMatchLength()) != 0
-                || winner().repetitionMetrics().repeated32ByteSubstrings() != candidate.repetitionMetrics().repeated32ByteSubstrings()
-                || !winner().filterUsage().counts().equals(candidate.filterUsage().counts());
+        // Aggregate diagnostics can coincide for different byte streams, so only the exact stream fingerprint
+        // is strong enough evidence to exclude a candidate from final-size or explanatory comparisons.
+        return !entry.getKey().equals(best)
+                && winner() != null
+                && !winner().isFilterEquivalentTo(entry.getValue());
     }
 
     public String localBestFilter() {

@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompressionExplanationGeneratorTest {
@@ -211,6 +212,39 @@ class CompressionExplanationGeneratorTest {
         assertFalse(text.contains("100 vs 100"));
         assertTrue(new ExplanationContext("fixed-up", d, Map.of("fixed-up", 900L, "genetic", 900L, "entropy", 1000L))
                 .finalSizeRunnerUp().orElseThrow().getKey().equals("entropy"));
+    }
+
+    @Test
+    void preservesDifferentStreamsWithMatchingAggregateDiagnosticsAsFinalSizeCandidates() {
+        FilteredStreamDiagnostics winner = fingerprint(diag(100, 10, .8, 600, 200, 0, 300, .7,
+                usage(PngFilter.UP, 100)), "winner-stream");
+        FilteredStreamDiagnostics distinct = fingerprint(diag(100, 10, .8, 600, 200, 0, 300, .7,
+                usage(PngFilter.UP, 100)), "different-stream");
+        Map<String, FilteredStreamDiagnostics> diagnostics = new LinkedHashMap<>();
+        diagnostics.put("fixed-up", winner);
+        diagnostics.put("adaptive", distinct);
+
+        ExplanationContext context = new ExplanationContext("fixed-up", diagnostics,
+                Map.of("fixed-up", 900L, "adaptive", 901L));
+
+        assertEquals("adaptive", context.finalSizeRunnerUp().orElseThrow().getKey());
+    }
+
+    @Test
+    void usesFinalSizeRunnerUpThroughoutMetricExplanationWhenLzOrderDiffers() {
+        Map<String, FilteredStreamDiagnostics> diagnostics = new LinkedHashMap<>();
+        diagnostics.put("fixed-up", fingerprint(diag(140, 12, .8, 600, 200, 0, 300, .7,
+                usage(PngFilter.UP, 100)), "winner"));
+        diagnostics.put("entropy", fingerprint(diag(100, 9, .5, 700, 150, 0, 300, .7,
+                mixedUsage(0, 50, 0, 50, 0)), "size-runner"));
+        diagnostics.put("adaptive", fingerprint(diag(120, 11, .7, 610, 180, 0, 300, .7,
+                mixedUsage(0, 60, 0, 40, 0)), "lz-runner"));
+
+        String text = generator.metricExplanation("fixed-up", diagnostics,
+                Map.of("fixed-up", 900L, "entropy", 910L, "adaptive", 950L));
+
+        assertTrue(text.contains("Compared with entropy"));
+        assertFalse(text.contains("Compared with adaptive"));
     }
 
     private static FilteredStreamDiagnostics fingerprint(FilteredStreamDiagnostics d, String fingerprint) {
