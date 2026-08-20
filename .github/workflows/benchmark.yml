@@ -78,7 +78,8 @@ jobs:
             --markdown build/reports/pngfilteropt/benchmark.md \
             --base-dir build/reports/pngfilteropt \
             --pages-dir build/pages \
-            --run-id "${{ github.run_id }}"
+            --run-id "${{ github.run_id }}" \
+            --repository-url "${{ github.server_url }}/${{ github.repository }}"
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -96,6 +97,7 @@ jobs:
             --base-dir build/reports/pngfilteropt \
             --pages-dir build/pages \
             --run-id "${{ github.run_id }}" \
+            --repository-url "${{ github.server_url }}/${{ github.repository }}" \
             --page-url "${{ steps.deployment.outputs.page_url }}"
 
       - name: Append benchmark summary

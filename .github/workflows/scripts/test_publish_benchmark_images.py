@@ -22,21 +22,23 @@ class PublishBenchmarkReportTest(unittest.TestCase):
             image.parent.mkdir(parents=True)
             image.write_bytes(b"png")
             copied = stage_report(markdown, root / "reports", root / "pages", "123")
-            report = (root / "pages/123/index.html").read_text()
+            report = (root / "pages/index.html").read_text()
             self.assertEqual(["filter-visualizations/icon.filters.png"], copied)
             self.assertIn('<h2 id="Benchmark summary">Benchmark summary</h2>', report)
             self.assertIn("<table>", report)
             self.assertIn('<a href="#icon.png">icon.png</a>', report)
             self.assertIn('<h3 id="icon.png">icon.png</h3>', report)
-            self.assertTrue((root / "pages/123/report.md").is_file())
+            self.assertTrue((root / "pages/report.md").is_file())
             self.assertIn("<li>adaptive: 3 ms</li>", report)
-            self.assertTrue((root / "pages/123/filter-visualizations/icon.filters.png").is_file())
+            self.assertTrue((root / "pages/filter-visualizations/icon.filters.png").is_file())
+            self.assertIn("<footer><hr><p>Workflow run 123", report)
+            self.assertIn('href="https://github.com/ZeroOne3010/png-filter-optimizer">GitHub repository</a>', report)
 
     def test_rewrite_adds_report_link_and_remote_image_urls(self):
         markdown = "![](filter-visualizations/icon filters.png)\n"
-        rewritten = rewrite_markdown(markdown, "https://example.test/site/", "run 1")
-        self.assertIn("[View this benchmark report on GitHub Pages](https://example.test/site/run%201/)", rewritten)
-        self.assertIn("![](https://example.test/site/run%201/filter-visualizations/icon%20filters.png)", rewritten)
+        rewritten = rewrite_markdown(markdown, "https://example.test/site/")
+        self.assertIn("[View this benchmark report on GitHub Pages](https://example.test/site/)", rewritten)
+        self.assertIn("![](https://example.test/site/filter-visualizations/icon%20filters.png)", rewritten)
 
     def test_report_parser_preserves_collapsible_diagnostics_and_strong_winner_cells(self):
         markdown = '<a id="image-icon.png-abcd1234"></a>\n<details>\n<summary>Diagnostics</summary>\n\n| Strategy | Size |\n|---|---:|\n| <strong>adaptive</strong> | <strong>12</strong> |\n\n</details>\n'

@@ -13,6 +13,7 @@ from urllib.parse import quote
 
 IMAGE_PATTERN = re.compile(r"!\[([^\]]*)\]\((?!data:|https?://)([^)]+\.png)\)")
 INLINE_PATTERN = re.compile(r"(!?\[[^\]]*\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|</?strong>)")
+DEFAULT_REPOSITORY_URL = "https://github.com/ZeroOne3010/png-filter-optimizer"
 
 
 @dataclass(frozen=True)
@@ -62,7 +63,7 @@ class Report:
         """Render the document back to Markdown for summaries and PR comments."""
         return "\n\n".join("\n".join(block.lines) for block in self.blocks) + "\n"
 
-    def render_html(self, title: str) -> str:
+    def render_html(self, title: str, footer: str = "") -> str:
         body = "\n".join(_render_block(block) for block in self.blocks)
         escaped_title = html.escape(title)
         return f"""<!doctype html>
@@ -76,10 +77,12 @@ body {{ color: #1f2328; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe
 a {{ color: #0969da; }} table {{ border-collapse: collapse; display: block; max-width: 100%; overflow: auto; }}
 th, td {{ border: 1px solid #d0d7de; padding: .35rem .7rem; }} th {{ background: #f6f8fa; }}
 img {{ border: 1px solid #d0d7de; image-rendering: pixelated; max-width: 100%; }} code {{ background: #eff1f3; padding: .1rem .25rem; }}
+footer {{ color: #59636e; font-size: .7rem; margin-top: 2rem; }} footer hr {{ border: 0; border-top: 1px solid #d0d7de; }}
 </style>
 </head>
 <body>
 {body}
+{footer}
 </body>
 </html>
 """
@@ -161,35 +164,39 @@ def image_refs(markdown: str) -> list[str]:
     return list(dict.fromkeys(match.group(2) for match in IMAGE_PATTERN.finditer(markdown)))
 
 
-def stage_report(markdown: str, base_dir: Path, pages_dir: Path, run_id: str) -> list[str]:
-    run_dir = pages_dir / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
+def stage_report(
+    markdown: str,
+    base_dir: Path,
+    pages_dir: Path,
+    run_id: str,
+    repository_url: str = DEFAULT_REPOSITORY_URL,
+) -> list[str]:
+    pages_dir.mkdir(parents=True, exist_ok=True)
     copied: list[str] = []
     for src in image_refs(markdown):
         relative_path = safe_relative_path(src)
         source = (base_dir / relative_path).resolve()
         if not source.is_file():
             raise FileNotFoundError(f"Markdown image reference does not exist: {source}")
-        destination = run_dir / relative_path
+        destination = pages_dir / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
         copied.append(relative_path.as_posix())
 
-    title = f"PNG corpus benchmark report for run {run_id}"
+    title = "Latest PNG corpus benchmark report"
     report = Report.parse(markdown)
-    run_dir.joinpath("report.md").write_text(report.render_markdown(), encoding="utf-8")
-    run_dir.joinpath("index.html").write_text(report.render_html(title), encoding="utf-8")
-    pages_dir.joinpath("index.html").write_text(
-        "<!doctype html>\n<meta charset=\"utf-8\">\n"
-        "<title>Latest PNG corpus benchmark report</title>\n"
-        f'<p>Latest PNG corpus benchmark report: <a href="{html.escape(run_id)}/">run {html.escape(run_id)}</a>.</p>\n',
-        encoding="utf-8",
+    pages_dir.joinpath("report.md").write_text(report.render_markdown(), encoding="utf-8")
+    footer = (
+        '<footer><hr><p>Workflow run '
+        f'{html.escape(run_id)} · <a href="{html.escape(repository_url, quote=True)}">GitHub repository</a>'
+        "</p></footer>"
     )
+    pages_dir.joinpath("index.html").write_text(report.render_html(title, footer), encoding="utf-8")
     return copied
 
 
-def rewrite_markdown(markdown: str, page_url: str, run_id: str) -> str:
-    base_url = page_url.rstrip("/") + "/" + quote(run_id, safe="-._~") + "/"
+def rewrite_markdown(markdown: str, page_url: str) -> str:
+    base_url = page_url.rstrip("/") + "/"
 
     def replace(match: re.Match[str]) -> str:
         alt = match.group(1)
@@ -207,13 +214,14 @@ def main() -> None:
     parser.add_argument("--base-dir", type=Path, required=True)
     parser.add_argument("--pages-dir", type=Path, required=True)
     parser.add_argument("--run-id", required=True)
+    parser.add_argument("--repository-url", default=DEFAULT_REPOSITORY_URL)
     parser.add_argument("--page-url", help="Rewrite markdown image references and add the report URL for summaries and comments.")
     args = parser.parse_args()
 
     markdown = args.markdown.read_text(encoding="utf-8")
-    copied = stage_report(markdown, args.base_dir, args.pages_dir, args.run_id)
+    copied = stage_report(markdown, args.base_dir, args.pages_dir, args.run_id, args.repository_url)
     if args.page_url:
-        args.markdown.write_text(rewrite_markdown(markdown, args.page_url, args.run_id), encoding="utf-8")
+        args.markdown.write_text(rewrite_markdown(markdown, args.page_url), encoding="utf-8")
     action = "staged and rewrote" if args.page_url else "staged"
     print(f"{action} benchmark report and {len(copied)} image(s) for GitHub Pages.")
 

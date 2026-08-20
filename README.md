@@ -54,7 +54,7 @@ Benchmark reports copy each original PNG under `source-images/` next to the mark
 
 For every non-trivial layout (more than one contiguous filter run), `benchmark` also writes a 256-color palettized PNG visualization under `filter-visualizations/` next to the markdown report. The visualization retains the source image's original dimensions and tints source rows by filter: `NONE` red, `SUB` orange, `UP` blue, `AVERAGE` green, and `PAETH` purple.
 
-The provided benchmark GitHub Action publishes source images and previews through a GitHub Pages artifact under a path containing the current workflow run ID and rewrites report image references to the resulting Pages URLs. Each Pages deployment contains only the current run's image paths, so older PR comments do not accidentally show images from newer runs after a later deployment replaces the site. The repository's Pages source must be configured for GitHub Actions deployments.
+The provided benchmark GitHub Action publishes the latest report directly on the GitHub Pages index, along with its source images and previews, and rewrites report image references to the resulting Pages URLs. Each Pages deployment contains only the current run; its workflow run ID and a link to this repository appear in the report footer. The repository's Pages source must be configured for GitHub Actions deployments.
 
 ## Quick examples
 
